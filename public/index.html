@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naval War - Multiplayer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a1628 0%, #1e3a5f 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(180deg, #d9dee1 0%, #c7cfd5 100%);
+            box-shadow: 0 0 50px rgba(0, 150, 255, 0.3);
+        }
+
+        #ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .ui-element {
+            pointer-events: auto;
+        }
+
+        #stats {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid rgba(0, 150, 255, 0.5);
+            min-width: 200px;
+        }
+
+        #shipInfo {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid rgba(0, 150, 255, 0.5);
+            max-width: 250px;
+        }
+
+        #playersAlive {
+            position: absolute;
+            bottom: 170px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 150, 255, 0.6);
+            z-index: 15;
+        }
+
+        #playersAlive h3 {
+            display: none;
+        }
+
+        #playersAlive .player-count {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        #playersAlive .player-label {
+            display: none;
+        }
+
+        #leaderboard {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid rgba(0, 150, 255, 0.5);
+            min-width: 200px;
+        }
+
+        .stat-row {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #0096ff);
+            transition: width 0.3s;
+        }
+
+        h3 {
+            color: #00ff88;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .tier-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: linear-gradient(135deg, #ff6b00, #ff9500);
+            border-radius: 5px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        #startScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 22, 40, 0.55); /* semi-transparent so canvas is visible behind */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        #startScreen h1 {
+            font-size: 4em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(0, 150, 255, 0.8);
+            background: linear-gradient(135deg, #00ff88, #0096ff);
+            color: red;
+        }
+
+        #startBtn {
+            padding: 15px 40px;
+            font-size: 1.5em;
+            background: linear-gradient(135deg, #00ff88, #0096ff);
+            border: none;
+            border-radius: 10px;
+            color: red;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 20px rgba(0, 150, 255, 0.4);
+        }
+
+        #startBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 150, 255, 0.6);
+        }
+
+        #connectionStatus {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 5px 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .connected {
+            color: #00ff88;
+        }
+
+        .disconnected {
+            color: #ff5555;
+        }
+
+        .player-label {
+            position: absolute;
+            color: #00ff88;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen" class="ui-element">
+        <h1>NAVAL WAR</h1>
+        <p style="margin-bottom: 12px; opacity: 0.9;">Multiplayer Naval Combat!</p>
+        <input id="gameNameInput" placeholder="Enter game name (optional)" style="padding:10px;border-radius:8px;border:1px solid #0096ff;margin-bottom:10px;width:280px;text-align:center;">
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button id="startBtn">JOIN BATTLE</button>
+            <button id="howBtn" style="background: rgba(255,255,255,0.06); border: 1px solid #0096ff; color: #fff; padding:8px 12px; border-radius:8px;">How to Play</button>
+        </div>
+
+        <div id="howModal" style="display:none; position: absolute; inset: 20% 20%; background: rgba(0,0,0,0.9); border: 2px solid #0096ff; padding: 20px; border-radius: 10px; z-index: 200;">
+            <h2 style="color:#00ff88;">How to Play</h2>
+            <ul style="margin-top:10px;">
+                <li>Mouse: Aim & Turn</li>
+                <li>W/↑: Forward — S/↓: Reverse</li>
+                <li>Click: Fire — Space: Special</li>
+                <li>Destroy enemies to gain XP and tier up</li>
+            </ul>
+            <button id="closeHow" style="margin-top:12px; padding:8px 12px; border-radius:8px;">Close</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-overlay">
+        <div id="connectionStatus" class="ui-element disconnected">Disconnected</div>
+        
+        <div id="stats" class="ui-element">
+            <h3>YOUR STATS</h3>
+            <div class="stat-row">
+                <span>Ship:</span>
+                <span id="shipClass">-</span>
+                <span class="tier-badge">T1</span>
+            </div>
+            <div class="stat-row">
+                <span>XP:</span>
+                <span id="xp">0 / 100</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="xpBar" style="width: 0%"></div>
+            </div>
+            <div class="stat-row">
+                <span>Kills:</span>
+                <span id="kills">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Score:</span>
+                <span id="score">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Mines:</span>
+                <span id="mines">0 / 5</span>
+            </div>
+            <div class="stat-row">
+                <span>Mine CD:</span>
+                <span id="mineCD">Ready</span>
+            </div>
+        </div>
+
+        <div id="shipInfo" class="ui-element">
+            <h3>SHIP INFO</h3>
+            <div class="stat-row">
+                <span>Health:</span>
+                <span id="health">100%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="healthBar" style="width: 100%"></div>
+            </div>
+            <div class="stat-row">
+                <span>Speed:</span>
+                <span id="speed">-</span>
+            </div>
+            <div class="stat-row">
+                <span>Firepower:</span>
+                <span id="firepower">-</span>
+            </div>
+        </div>
+
+        <div id="playersAlive" class="ui-element">
+            <h3>PLAYERS ALIVE</h3>
+            <div class="player-count" id="playerCountDisplay">0</div>
+            <div class="player-label">Humans + Bots</div>
+        </div>
+
+        <div id="leaderboard" class="ui-element">
+            <h3>LEADERBOARD</h3>
+            <div id="leaderboardList"></div>
+        </div>
+        <!-- Win overlay shown when the local player is the last one standing -->
+        <div id="winOverlay" class="ui-element" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:20; pointer-events:auto;">
+            <div style="background:rgba(0,0,0,0.85); padding:28px; border-radius:12px; border:2px solid #00ff88; text-align:center; min-width:280px;">
+                <h2 style="color:#00ff88; margin-bottom:12px;">You Win!</h2>
+                <button id="playAgainBtn" style="padding:10px 18px; border-radius:8px; border:none; background:#00a0ff; color:#fff; font-weight:600; cursor:pointer;">Play Again</button>
+            </div>
+        </div>
+        <!-- Death overlay shown when the local player is eliminated -->
+        <div id="deathOverlay" class="ui-element" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:20; pointer-events:auto;">
+            <div style="background:rgba(0,0,0,0.85); padding:28px; border-radius:12px; border:2px solid #ff6666; text-align:center; min-width:280px;">
+                <h2 style="color:#ff6666; margin-bottom:12px;">You Died!</h2>
+                <button id="deathPlayAgainBtn" style="padding:10px 18px; border-radius:8px; border:none; background:#00a0ff; color:#fff; font-weight:600; cursor:pointer;">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check for win condition: local player is the last one standing AND no AI ships remain
+        function checkForWin() {
+            try {
+                if (!gameState || !gameState.players || !myPlayerId) return;
+                const players = gameState.players;
+                const aiShips = gameState.aiShips || [];
+                const winOverlay = document.getElementById('winOverlay');
+                const now = performance.now();
+                // Ignore win detection for the first 5 seconds of a round
+                if (gameStartTime && (now - gameStartTime) < 5000) {
+                    if (winOverlay) winOverlay.style.display = 'none';
+                    winCandidateSince = 0;
+                    return;
+                }
+
+                if (!players || players.length === 0) {
+                    if (winOverlay) winOverlay.style.display = 'none';
+                    winCandidateSince = 0;
+                    return;
+                }
+
+                // Require: local player is last human AND no AI remain
+                const singlePlayerNow = (players.length === 1 && players[0].id === myPlayerId && aiShips.length === 0);
+                if (singlePlayerNow) {
+                    if (!winCandidateSince) winCandidateSince = now;
+                    if (now - winCandidateSince >= 500) {
+                        if (winOverlay) winOverlay.style.display = 'flex';
+                    }
+                } else {
+                    if (winOverlay) winOverlay.style.display = 'none';
+                    winCandidateSince = 0;
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        // Check if local player is dead
+        function checkForDeath() {
+            try {
+                if (!gameState || !gameState.players || !myPlayerId) return;
+                const players = gameState.players;
+                const deathOverlay = document.getElementById('deathOverlay');
+                const playerAlive = players.some(p => p.id === myPlayerId);
+                if (!playerAlive && gameStarted) {
+                    if (deathOverlay) deathOverlay.style.display = 'flex';
+                } else {
+                    if (deathOverlay) deathOverlay.style.display = 'none';
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        // Play Again buttons: reload the page
+        (function setupPlayAgain() {
+            const btn = document.getElementById('playAgainBtn');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    location.reload();
+                });
+            }
+            
+            const deathBtn = document.getElementById('deathPlayAgainBtn');
+            if (deathBtn) {
+                deathBtn.addEventListener('click', () => {
+                    location.reload();
+                });
+            }
+        })();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let ws = null;
+        let gameStarted = false;
+        let myPlayerId = null;
+        let gameState = {
+            players: [],
+            aiShips: [],
+            projectiles: [],
+            effects: [],
+            mines: []
+        };
+        let camera = { x: 0, y: 0 };
+        let demoMode = true; // show demo in lobby
+        let demoShips = [];
+        let chosenGameName = '';
+        let mouse = { x: 0, y: 0, clicking: false };
+        let keys = {};
+        // Input throttle to reduce network traffic (send ~15 Hz)
+        const INPUT_SEND_INTERVAL_MS = 66;
+        let __lastInputSentAt = 0;
+        let __lastDeployMineState = false;
+        let __lastFiringState = false;
+
+        // Performance mode (auto-enabled when FPS drops)
+        let perfMode = false;
+        let frameTimes = [];
+        let lastFrameTime = performance.now();
+        let pageHidden = false;
+        // Timestamp when the current round/game started (used to ignore early wins)
+        let gameStartTime = 0;
+        // When a potential win is first detected, record the time to avoid flicker/false positives
+        let winCandidateSince = 0;
+
+        // Canvas Setup
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Track page visibility
+        document.addEventListener('visibilitychange', () => {
+            pageHidden = document.hidden;
+        });
+
+        // Connect to server
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('Connected to server');
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                document.getElementById('connectionStatus').className = 'ui-element connected';
+                
+                // Send join message (include game name if provided)
+                const joinPayload = { type: 'join' };
+                if (chosenGameName && chosenGameName.length) joinPayload.gameName = chosenGameName;
+                ws.send(JSON.stringify(joinPayload));
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'joined') {
+                    myPlayerId = data.playerId;
+                    console.log('Joined as player:', myPlayerId);
+                    // adopt server-assigned gameName if provided
+                    if (data.player && data.player.gameName) {
+                        chosenGameName = data.player.gameName;
+                        const status = document.getElementById('connectionStatus');
+                        if (status) status.textContent = chosenGameName ? `Connected - ${chosenGameName}` : 'Connected';
+                    }
+                } else if (data.type === 'gameState') {
+                    gameState = data;
+                    // Check for win condition (local player is last one standing) and death
+                    try { checkForWin(); } catch (e) {}
+                    try { checkForDeath(); } catch (e) {}
+                }
+            };
+            
+            ws.onclose = () => {
+                console.log('Disconnected from server');
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('connectionStatus').className = 'ui-element disconnected';
+                
+                // Try to reconnect after 3 seconds
+                setTimeout(() => {
+                    if (gameStarted) {
+                        connect();
+                    }
+                }, 3000);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Send input to server
+        function sendInput() {
+            if (!ws || ws.readyState !== WebSocket.OPEN || !myPlayerId) return;
+            
+            const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+            if (!myPlayer) return;
+            
+            const screenMouseX = mouse.x - canvas.width / 2;
+            const screenMouseY = mouse.y - canvas.height / 2;
+            const targetAngle = Math.atan2(screenMouseY, screenMouseX);
+            
+            const input = {
+                forward: keys['w'] || keys['ArrowUp'],
+                backward: keys['s'] || keys['ArrowDown'],
+                angle: targetAngle,
+                firing: mouse.clicking
+            };
+
+            // Throttle sending input to reduce lag
+            const now = Date.now();
+            const deployMineState = !!keys[' '];
+            const firingState = !!mouse.clicking;
+
+            const hasStateChanged = deployMineState !== __lastDeployMineState || firingState !== __lastFiringState;
+            if (now - __lastInputSentAt > INPUT_SEND_INTERVAL_MS || hasStateChanged) {
+                ws.send(JSON.stringify({
+                    type: 'input',
+                    input: input,
+                    deployMine: deployMineState
+                }));
+                __lastInputSentAt = now;
+                __lastDeployMineState = deployMineState;
+                __lastFiringState = firingState;
+            }
+        }
+
+        // Draw functions
+        function drawShip(ship, isPlayer = false) {
+            ctx.save();
+            ctx.translate(ship.x - camera.x, ship.y - camera.y);
+            ctx.rotate(ship.angle);
+
+            // Draw ship body
+            ctx.fillStyle = ship.data.color;
+            ctx.strokeStyle = isPlayer ? '#00ff88' : '#ffffff';
+            ctx.lineWidth = isPlayer ? 3 : 2;
+
+            ctx.beginPath();
+            if (ship.data.tier < 5) {
+                ctx.moveTo(ship.data.size, 0);
+                ctx.lineTo(ship.data.size * 0.7, -ship.data.size * 0.5);
+                ctx.lineTo(-ship.data.size * 0.8, -ship.data.size * 0.3);
+                ctx.lineTo(-ship.data.size, 0);
+                ctx.lineTo(-ship.data.size * 0.8, ship.data.size * 0.3);
+                ctx.lineTo(ship.data.size * 0.7, ship.data.size * 0.5);
+            } else if (ship.data.tier < 10) {
+                ctx.moveTo(ship.data.size * 1.2, 0);
+                ctx.lineTo(ship.data.size, -ship.data.size * 0.4);
+                ctx.lineTo(ship.data.size * 0.3, -ship.data.size * 0.5);
+                ctx.lineTo(-ship.data.size * 0.6, -ship.data.size * 0.4);
+                ctx.lineTo(-ship.data.size, 0);
+                ctx.lineTo(-ship.data.size * 0.6, ship.data.size * 0.4);
+                ctx.lineTo(ship.data.size * 0.3, ship.data.size * 0.5);
+                ctx.lineTo(ship.data.size, ship.data.size * 0.4);
+            } else {
+                ctx.moveTo(ship.data.size * 1.5, 0);
+                ctx.lineTo(ship.data.size * 1.2, -ship.data.size * 0.3);
+                ctx.lineTo(ship.data.size * 0.8, -ship.data.size * 0.5);
+                ctx.lineTo(0, -ship.data.size * 0.6);
+                ctx.lineTo(-ship.data.size * 0.8, -ship.data.size * 0.5);
+                ctx.lineTo(-ship.data.size * 1.2, 0);
+                ctx.lineTo(-ship.data.size * 0.8, ship.data.size * 0.5);
+                ctx.lineTo(0, ship.data.size * 0.6);
+                ctx.lineTo(ship.data.size * 0.8, ship.data.size * 0.5);
+                ctx.lineTo(ship.data.size * 1.2, ship.data.size * 0.3);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw health bar
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+            ctx.fillRect(-ship.data.size, -ship.data.size - 20, ship.data.size * 2, 5);
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+            ctx.fillRect(-ship.data.size, -ship.data.size - 20, ship.data.size * 2 * (ship.health / ship.maxHealth), 5);
+
+            ctx.restore();
+            
+            // Draw label for other ships (human players and AI bots), except the local player
+            if (!isPlayer) {
+                ctx.fillStyle = '#00ff88';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                const nameLabel = (ship.gameName && ship.gameName.length)
+                    ? ship.gameName
+                    : (ship.id && ship.id.startsWith && ship.id.startsWith('ai_') ? 'Bot' : 'Player');
+                ctx.fillText(nameLabel, ship.x - camera.x, ship.y - camera.y - ship.data.size - 30);
+            }
+        }
+
+        function drawProjectile(proj) {
+            const isFromPlayer = gameState.players.some(p => p.id === proj.ownerId);
+            
+            ctx.save();
+            ctx.translate(proj.x - camera.x, proj.y - camera.y);
+            ctx.rotate(proj.angle);
+            
+            ctx.fillStyle = isFromPlayer ? '#00ff88' : '#ff5555';
+            if (!perfMode) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = ctx.fillStyle;
+            }
+            ctx.fillRect(-5, -2, 10, 4);
+            
+            ctx.restore();
+        }
+
+        function drawEffect(effect) {
+            // In perf mode, skip small fragments to reduce draw cost
+            if (perfMode && effect.type === 'explosion_fragment') return;
+
+            ctx.save();
+            ctx.translate(effect.x - camera.x, effect.y - camera.y);
+            
+            if (effect.type === 'explosion') {
+                let radius = effect.radius || 30;
+                const life = effect.lifetime || 1;
+                const alpha = Math.max(0.2, Math.min(0.9, life / 1.5));
+
+                // In perf mode, cap the rendered radius to avoid huge gradients
+                if (perfMode) radius = Math.min(radius, 140);
+
+                // Large radial gradient for big explosions
+                const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+                grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+                grad.addColorStop(0.15, `rgba(255, 200, 80, ${alpha})`);
+                grad.addColorStop(0.35, `rgba(255, 136, 0, ${alpha * 0.9})`);
+                grad.addColorStop(1, `rgba(255, 80, 0, 0)`);
+
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Add outer shock rings for really big booms
+                if (radius > 120 && !perfMode) {
+                    ctx.strokeStyle = `rgba(255,120,40,${alpha * 0.6})`;
+                    ctx.lineWidth = Math.min(12, radius * 0.05);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius * 0.9, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else if (effect.type === 'explosion_fragment') {
+                const size = 3 + Math.random() * 5;
+                const alpha = Math.max(0.05, Math.min(0.9, (effect.lifetime || 1) / 1.5));
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = '#ffcc88';
+                ctx.beginPath();
+                ctx.arc(0, 0, size, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (effect.type === 'damage') {
+                ctx.globalAlpha = 0.8;
+                ctx.fillStyle = '#ff5555';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`-${Math.floor(effect.value)}`, 0, 0);
+            } else if (effect.type === 'levelup') {
+                ctx.globalAlpha = 0.8;
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, 80, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('TIER UP!', 0, 0);
+            }
+            
+            ctx.restore();
+        }
+
+        function drawMine(mine) {
+            ctx.save();
+            ctx.translate(mine.x - camera.x, mine.y - camera.y);
+            
+            // Determine owner for color (AI mines are purple-ish)
+            const ownerIsAI = gameState.aiShips && gameState.aiShips.some(s => s.id === mine.ownerId);
+
+            // Draw mine as a spinning spike ball (inactive = dimmer, active = bright)
+            const baseAlpha = mine.active ? 0.9 : 0.4;
+            const color = mine.active ? (ownerIsAI ? '#b44cff' : '#ff0000') : (ownerIsAI ? '#cfa3ff' : '#ff6666');
+            const radius = 12;
+
+            // Simplified rendering in performance mode
+            if (perfMode) {
+                ctx.fillStyle = color;
+                ctx.globalAlpha = baseAlpha;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                return;
+            }
+            
+            ctx.fillStyle = color;
+            ctx.globalAlpha = baseAlpha;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw spikes
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = baseAlpha;
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+                ctx.lineTo(Math.cos(angle) * (radius + 6), Math.sin(angle) * (radius + 6));
+                ctx.stroke();
+            }
+            
+            // Draw activation indicator (pulsing circle for inactive)
+            if (!mine.active) {
+                const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7;
+                const pulseColor = ownerIsAI ? `rgba(180, 76, 255, ${pulse * baseAlpha})` : `rgba(255, 100, 100, ${pulse * baseAlpha})`;
+                ctx.strokeStyle = pulseColor;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius + 8, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawMinimap() {
+            const mapSize = 150;
+            const mapX = 10;
+            const mapY = canvas.height - mapSize - 10;
+            const worldSize = 3000;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(mapX, mapY, mapSize, mapSize);
+            
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+            
+            // Draw all ships
+            [...gameState.players, ...gameState.aiShips].forEach(ship => {
+                const mx = mapX + (ship.x / worldSize + 1) * mapSize / 2;
+                const my = mapY + (ship.y / worldSize + 1) * mapSize / 2;
+                
+                if (ship.id === myPlayerId) {
+                    ctx.fillStyle = '#00ff88';
+                    ctx.beginPath();
+                    ctx.arc(mx, my, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (!ship.id.startsWith('ai_')) {
+                    ctx.fillStyle = '#00aaff';
+                    ctx.beginPath();
+                    ctx.arc(mx, my, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = ship.data.tier >= 10 ? '#ff0000' : '#ff8888';
+                    ctx.beginPath();
+                    ctx.arc(mx, my, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        // Demo mode: create sample ships that move for the lobby background
+    
+        function initDemoShips() {
+            demoShips = [];
+            const shipTemplate = { tier: 1, name: 'Patrol Boat', variant: 'Gunboat', speed: 240, armor: 20, firepower: 15, health: 100, color: '#4CAF50', size: 20 };
+            for (let i = 0; i < 20; i++) {
+                //20 boats
+                demoShips.push({
+                    id: `demo_${i}`,
+                    x: (Math.random() - 0.5) * 1600,
+                    y: (Math.random() - 0.5) * 1600,
+                    angle: Math.random() * Math.PI * 2,
+                    velocityX: 0,
+                    velocityY: 0,
+                    data: shipTemplate,
+                    health: shipTemplate.health,
+                    maxHealth: shipTemplate.health,
+                    isAI: true
+                });
+            }
+        }
+
+        function updateDemo(dt) {
+            // slow camera pan
+            camera.x += Math.sin(performance.now() / 5000) * 0.2 * dt * 60;
+            camera.y += Math.cos(performance.now() / 7000) * 0.15 * dt * 60;
+            demoShips.forEach(s => {
+                // simple wander behavior
+                s.angle += (Math.random() - 0.5) * 0.01;
+                const thrust = s.data.speed * 0.25;
+                s.velocityX += Math.cos(s.angle) * thrust * dt;
+                s.velocityY += Math.sin(s.angle) * thrust * dt;
+                s.x += s.velocityX * dt;
+                s.y += s.velocityY * dt;
+                s.velocityX *= 0.97;
+                s.velocityY *= 0.97;
+                // keep in world bounds
+                const worldSize = 3000;
+                if (s.x < -worldSize || s.x > worldSize) s.angle += Math.PI;
+                if (s.y < -worldSize || s.y > worldSize) s.angle += Math.PI;
+            });
+        }
+
+        // Draw animated subtle ocean designs under the grid
+        function drawOceanDesigns() {
+            // Skip heavy designs when in performance mode
+            if (perfMode) return;
+
+            // Static red designs across the map, anchored in world coordinates
+            const w = canvas.width;
+            const h = canvas.height;
+            const worldSize = 3000;
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            // Draw a grid of static decorative marks
+            const spacing = 300; // distance between decorations in world units
+            const halfWorld = worldSize;
+            const minX = Math.floor((camera.x - 50 - halfWorld) / spacing) * spacing;
+            const maxX = Math.floor((camera.x + w + 50 + halfWorld) / spacing) * spacing;
+            const minY = Math.floor((camera.y - 50 - halfWorld) / spacing) * spacing;
+            const maxY = Math.floor((camera.y + h + 50 + halfWorld) / spacing) * spacing;
+
+            for (let wy = minY; wy <= maxY; wy += spacing) {
+                for (let wx = minX; wx <= maxX; wx += spacing) {
+                    const sx = wx - camera.x;
+                    const sy = wy - camera.y;
+
+                    // Skip if completely offscreen
+                    if (sx < -200 || sx > w + 200 || sy < -200 || sy > h + 200) continue;
+
+                    // Draw a red circular splash
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 22, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.16)';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+
+                    // Draw a cross and diagonal lines to create patterns
+                    ctx.beginPath();
+                    ctx.moveTo(sx - 14, sy);
+                    ctx.lineTo(sx + 14, sy);
+                    ctx.moveTo(sx, sy - 14);
+                    ctx.lineTo(sx, sy + 14);
+                    ctx.moveTo(sx - 10, sy - 10);
+                    ctx.lineTo(sx + 10, sy + 10);
+                    ctx.moveTo(sx - 10, sy + 10);
+                    ctx.lineTo(sx + 10, sy - 10);
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.12)';
+                    ctx.lineWidth = 1.4;
+                    ctx.stroke();
+
+                    // Add small four dots around center for texture
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.14)';
+                    ctx.beginPath(); ctx.arc(sx - 8, sy - 8, 2.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(sx + 8, sy - 8, 2.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(sx - 8, sy + 8, 2.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(sx + 8, sy + 8, 2.5, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            // Add larger static red rings (occasional relic designs)
+            const ringSpacing = 900;
+            for (let ry = -halfWorld; ry <= halfWorld; ry += ringSpacing) {
+                for (let rx = -halfWorld; rx <= halfWorld; rx += ringSpacing) {
+                    const sx = rx - camera.x;
+                    const sy = ry - camera.y;
+                    if (sx < -800 || sx > w + 800 || sy < -800 || sy > h + 800) continue;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 70, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.12)';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function updateUI() {
+            const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+            if (!myPlayer) return;
+            
+            document.getElementById('shipClass').textContent = `${myPlayer.data.name}`;
+            document.querySelector('.tier-badge').textContent = `T${myPlayer.data.tier}`;
+            document.getElementById('xp').textContent = `${myPlayer.xp} / ${myPlayer.data.xpRequired}`;
+            document.getElementById('xpBar').style.width = `${(myPlayer.xp / myPlayer.data.xpRequired) * 100}%`;
+            document.getElementById('kills').textContent = myPlayer.kills;
+            document.getElementById('score').textContent = myPlayer.score;
+            document.getElementById('health').textContent = `${Math.ceil(myPlayer.health)}/${myPlayer.maxHealth}`;
+            document.getElementById('healthBar').style.width = `${(myPlayer.health / myPlayer.maxHealth) * 100}%`;
+            
+            const speedText = myPlayer.data.speed > 240 ? 'Fast' : myPlayer.data.speed > 180 ? 'Medium' : 'Slow';
+            const firepowerText = myPlayer.data.firepower > 60 ? 'Heavy' : myPlayer.data.firepower > 30 ? 'Medium' : 'Light';
+            
+            document.getElementById('speed').textContent = speedText;
+            document.getElementById('firepower').textContent = firepowerText;
+
+            // Update mine UI (count and cooldown)
+            const mineCountElem = document.getElementById('mines');
+            const mineCdElem = document.getElementById('mineCD');
+            if (mineCountElem) mineCountElem.textContent = `${myPlayer.activeMines || 0} / 5`;
+            if (mineCdElem) mineCdElem.textContent = myPlayer.mineTimer && myPlayer.mineTimer > 0 ? `${myPlayer.mineTimer.toFixed(1)}s` : 'Ready';
+            
+            // Update leaderboard
+            // Update leaderboard - include both human players and AI bots
+            const allShips = [...gameState.players, ...gameState.aiShips]
+                .sort((a, b) => (b.score || 0) - (a.score || 0))
+                .slice(0, 10);
+            
+            const leaderboardHtml = allShips.map((ship, i) => {
+                const isPlayer = !ship.id.startsWith('ai_');
+                const isMe = ship.id === myPlayerId;
+                // Use the provided gameName when available
+                const label = isMe ? 'YOU' : (ship.gameName && ship.gameName.length ? ship.gameName : (isPlayer ? 'Player' : 'AI'));
+                const color = isMe ? '#00ff88' : isPlayer ? '#00aaff' : '#ffff88';
+                return `<div style="color: ${color}; margin: 5px 0;">
+                    ${i + 1}. ${label} - ${ship.score || 0}
+                </div>`;
+            }).join('');
+            
+            document.getElementById('leaderboardList').innerHTML = leaderboardHtml;
+
+            // Update players alive counter (count both human players and AI bots)
+            const totalPlayersAlive = (gameState.players?.length || 0) + (gameState.aiShips?.length || 0);
+            document.getElementById('playerCountDisplay').textContent = totalPlayersAlive;
+        }
+
+        function render() {
+            ctx.fillStyle = '#072844';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Simple on-screen test helper
+            function isOnScreen(x, y, margin = 300) {
+                return x - camera.x >= -margin && x - camera.x <= canvas.width + margin && y - camera.y >= -margin && y - camera.y <= canvas.height + margin;
+            }
+
+            // Determine if we should reduce visuals when there are many entities
+            const totalEntities = (gameState.projectiles ? gameState.projectiles.length : 0) + (gameState.effects ? gameState.effects.length : 0) + (gameState.aiShips ? gameState.aiShips.length : 0) + (gameState.mines ? gameState.mines.length : 0) + (gameState.players ? gameState.players.length : 0);
+            const heavyMode = totalEntities > 300;
+
+            // Draw subtle animated ocean designs under the grid (skip when lagging)
+            if (!heavyMode) drawOceanDesigns();
+
+            // Draw grid
+            ctx.strokeStyle = 'rgba(0, 100, 200, 0.1)';
+            ctx.lineWidth = 1;
+            const gridSize = 100;
+            const startX = -camera.x % gridSize;
+            const startY = -camera.y % gridSize;
+            
+            for (let x = startX; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = startY; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw game objects (or demo when lobby is active)
+            if (!gameStarted) {
+                demoShips.forEach(ship => {
+                    if (isOnScreen(ship.x, ship.y, 800)) drawShip(ship, false);
+                });
+            } else {
+                // Ships
+                gameState.aiShips.forEach(ship => {
+                    if (isOnScreen(ship.x, ship.y)) drawShip(ship, false);
+                });
+                gameState.players.forEach(player => {
+                    if (isOnScreen(player.x, player.y)) drawShip(player, player.id === myPlayerId);
+                });
+
+                // Mines
+                gameState.mines.forEach(mine => {
+                    if (isOnScreen(mine.x, mine.y)) drawMine(mine);
+                });
+            }
+
+            // Projectiles (limit shading if many)
+            const projectilesToDraw = gameState.projectiles || [];
+            const disableProjectileShadow = projectilesToDraw.length > 150;
+            projectilesToDraw.forEach(proj => {
+                if (!isOnScreen(proj.x, proj.y)) return;
+                if (disableProjectileShadow) {
+                    // small optimization: remove shadow draws
+                    const savedShadow = ctx.shadowBlur;
+                    ctx.shadowBlur = 0;
+                    drawProjectile(proj);
+                    ctx.shadowBlur = savedShadow;
+                } else {
+                    drawProjectile(proj);
+                }
+            });
+
+            // Effects: show fewer when overloaded
+            const maxEffects = heavyMode ? 60 : 2000;
+            let drawnEffects = 0;
+            for (let i = 0; i < (gameState.effects || []).length && drawnEffects < maxEffects; i++) {
+                const effect = gameState.effects[i];
+                if (!isOnScreen(effect.x, effect.y)) continue;
+                drawEffect(effect);
+                drawnEffects++;
+            }
+            
+            drawMinimap();
+        }
+
+        let prevPerfMode = perfMode;
+        function gameLoop() {
+            // If page is hidden, drastically reduce update frequency to save CPU/network
+            if (pageHidden) {
+                setTimeout(() => {
+                    lastFrameTime = performance.now();
+                    gameLoop();
+                }, 1000);
+                return;
+            }
+
+            // Track frame times and enable perf mode if frames slow down
+            const now = performance.now();
+            const ms = now - lastFrameTime;
+            lastFrameTime = now;
+            frameTimes.push(ms);
+            if (frameTimes.length > 60) frameTimes.shift();
+            const avgMs = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+            perfMode = avgMs > 30; // enable perf mode when avg frame >30ms (~33 FPS)
+
+            // If perf mode changed, adjust canvas DPR/resolution
+            if (prevPerfMode !== perfMode) {
+                resizeCanvas();
+                prevPerfMode = perfMode;
+            }
+
+            if (gameStarted) {
+                // Update camera to follow player
+                const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+                if (myPlayer) {
+                    camera.x = myPlayer.x - canvas.width / 2;
+                    camera.y = myPlayer.y - canvas.height / 2;
+                }
+
+                if (!pageHidden) sendInput();
+                render();
+                updateUI();
+            } else {
+                // Update demo mode for lobby background
+                updateDemo(1 / 60);
+                render();
+                // also update UI if player exists (e.g. pre-join display)
+                updateUI();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event Listeners
+        canvas.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        canvas.addEventListener('mousedown', () => {
+            mouse.clicking = true;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            mouse.clicking = false;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            const nameInput = document.getElementById('gameNameInput');
+            chosenGameName = nameInput ? nameInput.value.trim() : '';
+            document.getElementById('startScreen').style.display = 'none';
+            gameStarted = true;
+            gameStartTime = performance.now();
+            demoMode = false;
+            connect();
+
+            // update header display with game name
+            const status = document.getElementById('connectionStatus');
+            if (status) {
+                status.textContent = chosenGameName ? `Connected - ${chosenGameName}` : 'Connected';
+            }
+        });
+
+        // How to modal event handlers
+        const howBtn = document.getElementById('howBtn');
+        const closeHow = document.getElementById('closeHow');
+        if (howBtn) howBtn.addEventListener('click', () => {
+            const modal = document.getElementById('howModal');
+            if (modal) modal.style.display = 'block';
+        });
+        if (closeHow) closeHow.addEventListener('click', () => {
+            const modal = document.getElementById('howModal');
+            if (modal) modal.style.display = 'none';
+        });
+
+        // Initialize demo lobby and start rendering loop
+        initDemoShips();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
