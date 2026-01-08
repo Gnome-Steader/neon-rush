@@ -87,6 +87,41 @@ const gameState = {
     nextEffectId: 0
 };
 
+// Fleets management (code -> { code, leaderId, members: Map(playerId -> meta) })
+gameState.fleets = new Map();
+
+// Map playerId -> WebSocket connection for direct notifications
+const connByPlayerId = new Map();
+
+// Helpers
+function generateFleetCode() {
+    // 6-digit numeric code
+    for (let i = 0; i < 6; i++) {
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        if (!gameState.fleets.has(code)) return code;
+    }
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function getEntityById(id) {
+    if (!id) return null;
+    if (gameState.players.has(id)) return gameState.players.get(id);
+    if (gameState.aiShips.has(id)) return gameState.aiShips.get(id);
+    return null;
+}
+
+function getFleetCodeForId(id) {
+    const p = getEntityById(id);
+    return p && p.fleetCode ? p.fleetCode : null;
+}
+
+function isFriendly(attackerId, target) {
+    if (!attackerId || !target) return false;
+    const aCode = getFleetCodeForId(attackerId);
+    const tCode = target && target.fleetCode ? target.fleetCode : null;
+    return aCode && tCode && aCode === tCode;
+} 
+
 // Broadcast throttling to help with lag -- send updates every N ticks
 let __tickCounter = 0;
 const BROADCAST_EVERY = 2; // send state every 2 server ticks (~15 updates/sec)
@@ -163,8 +198,9 @@ function updateAI(ship, dt) {
         let closestDist = Infinity;
         ship.targetId = null;
         
-        // Check players
+        // Check players (ignore lobby players)
         gameState.players.forEach(player => {
+            if (!player.inPlay) return;
             const dist = Math.hypot(player.x - ship.x, player.y - ship.y);
             if (dist < closestDist && dist < 500) {
                 closestDist = dist;
@@ -322,32 +358,36 @@ function takeDamage(ship, damage, attackerId) {
             });
         }
         
-        // Award XP to attacker
+        // Award kill to attacker and fleet (if any)
         const attacker = gameState.players.get(attackerId) || gameState.aiShips.get(attackerId);
         if (attacker) {
             attacker.kills++;
-            attacker.xp += ship.data.tier * 50;
             attacker.score += ship.data.tier * 50;
-            
-            // Check for level up
-            if (attacker.xp >= attacker.data.xpRequired) {
-                const nextTier = attacker.data.tier + 1;
-                const nextShips = SHIP_CLASSES.filter(s => s.tier === nextTier);
-                if (nextShips.length > 0) {
-                    const nextShip = nextShips[Math.floor(Math.random() * nextShips.length)];
-                    attacker.data = nextShip;
-                    attacker.maxHealth = nextShip.health;
-                    attacker.health = nextShip.health;
-                    attacker.xp = 0;
-                    
-                    gameState.effects.push({
-                        id: `effect_${gameState.nextEffectId++}`,
-                        type: 'levelup',
-                        x: attacker.x,
-                        y: attacker.y,
-                        lifetime: 2
-                    });
+
+            // Increment fleet kills if attacker is in a fleet
+            if (attacker.fleetCode) {
+                const fleet = gameState.fleets.get(attacker.fleetCode);
+                if (fleet) {
+                    fleet.kills = (fleet.kills || 0) + 1;
                 }
+            }
+            
+            // Level up on each kill
+            const nextTier = attacker.data.tier + 1;
+            const nextShips = SHIP_CLASSES.filter(s => s.tier === nextTier);
+            if (nextShips.length > 0) {
+                const nextShip = nextShips[Math.floor(Math.random() * nextShips.length)];
+                attacker.data = nextShip;
+                attacker.maxHealth = nextShip.health;
+                attacker.health = nextShip.health;
+                
+                gameState.effects.push({
+                    id: `effect_${gameState.nextEffectId++}`,
+                    type: 'levelup',
+                    x: attacker.x,
+                    y: attacker.y,
+                    lifetime: 2
+                });
             }
         }
         
@@ -441,28 +481,35 @@ function gameLoop() {
     gameState.projectiles.forEach(proj => {
         // Check player collisions
         gameState.players.forEach(player => {
-            if (proj.ownerId !== player.id) {
-                const dist = Math.hypot(proj.x - player.x, proj.y - player.y);
-                if (dist < player.data.size) {
-                    if (takeDamage(player, proj.damage, proj.ownerId)) {
-                        gameState.players.delete(player.id);
-                    }
-                    toRemove.add(proj.id);
+            // Skip players not yet in play
+            if (!player.inPlay) return;
+
+            // Skip self-hit
+            if (proj.ownerId === player.id) return;
+
+            // Friendly check: do not damage same-fleet members
+            const attacker = getEntityById(proj.ownerId);
+            if (attacker && isFriendly(attacker.id, player)) return;
+
+            const dist = Math.hypot(proj.x - player.x, proj.y - player.y);
+            if (dist < player.data.size) {
+                if (takeDamage(player, proj.damage, proj.ownerId)) {
+                    gameState.players.delete(player.id);
                 }
+                toRemove.add(proj.id);
             }
         });
         
         // Check AI collisions
         gameState.aiShips.forEach(ship => {
-            if (proj.ownerId !== ship.id) {
-                const dist = Math.hypot(proj.x - ship.x, proj.y - ship.y);
-                if (dist < ship.data.size) {
-                    if (takeDamage(ship, proj.damage, proj.ownerId)) {
-                        gameState.aiShips.delete(ship.id);
-                        // NOTE: Do not respawn AI here — AI should die permanently.
-                    }
-                    toRemove.add(proj.id);
+            if (proj.ownerId === ship.id) return;
+            const dist = Math.hypot(proj.x - ship.x, proj.y - ship.y);
+            if (dist < ship.data.size) {
+                if (takeDamage(ship, proj.damage, proj.ownerId)) {
+                    gameState.aiShips.delete(ship.id);
+                    // NOTE: Do not respawn AI here — AI should die permanently.
                 }
+                toRemove.add(proj.id);
             }
         });
     });
@@ -476,9 +523,12 @@ function gameLoop() {
     gameState.mines.forEach(mine => {
         if (!mine.active) return; // Skip inactive mines
 
-        // Determine if the mine should detonate (any ship stepped on it)
+        // Determine if the mine should detonate (any non-friendly ship stepped on it)
         let detonated = false;
         gameState.players.forEach(player => {
+            if (!player.inPlay) return;
+            // ignore if owner and player are in same fleet
+            if (isFriendly(mine.ownerId, player)) return;
             const d = Math.hypot(mine.x - player.x, mine.y - player.y);
             if (d < player.data.size + 15) detonated = true;
         });
@@ -492,11 +542,12 @@ function gameLoop() {
         // Explosion applies falloff damage to all ships within radius
         const explosionRadius = mine.explosionRadius || 250;
 
-        // Apply to players
+        // Apply to players (skip friendly)
         gameState.players.forEach(player => {
+            if (!player.inPlay) return;
+            if (isFriendly(mine.ownerId, player)) return;
             const d = Math.hypot(mine.x - player.x, mine.y - player.y);
-                if (d <= explosionRadius) {
-                // damage falls off linearly from center->edge; center gets mine.damage
+            if (d <= explosionRadius) {
                 const damage = Math.max(1, Math.round(mine.damage * (1 - (d / explosionRadius))));
                 if (takeDamage(player, damage, mine.ownerId)) {
                     gameState.players.delete(player.id);
@@ -507,7 +558,7 @@ function gameLoop() {
         // Apply to AI ships
         gameState.aiShips.forEach(ship => {
             const d = Math.hypot(mine.x - ship.x, mine.y - ship.y);
-                if (d <= explosionRadius) {
+            if (d <= explosionRadius) {
                 const damage = Math.max(1, Math.round(mine.damage * (1 - (d / explosionRadius))));
                 if (takeDamage(ship, damage, mine.ownerId)) {
                     gameState.aiShips.delete(ship.id);
@@ -563,7 +614,9 @@ function broadcastGameState() {
             score: p.score,
             gameName: p.gameName || '',
             mineTimer: p.mineTimer || 0,
-            activeMines: gameState.mines.filter(m => m.ownerId === p.id).length
+            activeMines: gameState.mines.filter(m => m.ownerId === p.id).length,
+            fleetCode: p.fleetCode || null,
+            inPlay: !!p.inPlay
         })),
         aiShips: Array.from(gameState.aiShips.values()).map(s => ({
             id: s.id,
@@ -576,8 +629,17 @@ function broadcastGameState() {
             gameName: s.gameName || '',
             xp: s.xp,
             kills: s.kills,
-            score: s.score
+            score: s.score,
+            fleetCode: null,
+            inPlay: true
         })),
+        fleets: Array.from(gameState.fleets.values()).map(f => ({
+            code: f.code,
+            leaderId: f.leaderId,
+            started: !!f.started,
+            kills: f.kills || 0,
+            members: Array.from(f.members.entries()).map(([id, m]) => ({ id, name: m.name }))
+        })), 
         projectiles: (gameState.projectiles.slice(-200)).map(p => ({
             id: p.id,
             x: p.x,
@@ -624,27 +686,28 @@ wss.on('connection', (ws) => {
     console.log('New client connected');
     
     const playerId = generateId('player');
-    
+    // register connection for playerId (allows leader notifications)
+    connByPlayerId.set(playerId, ws);
+    ws.playerId = playerId;
+
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
             
             if (data.type === 'join') {
-                // If there are currently no human players, treat this as the
-                // first join of a new round and (re)spawn AI ships.
-                if (!gameState.players || gameState.players.size === 0) {
+                // Create new player (accept optional gameName) — default solo join
+                // If there are currently no human players in play, respawn AI
+                const anyHumanPlaying = Array.from(gameState.players.values()).some(p => p.inPlay);
+                if (!anyHumanPlaying) {
                     console.log('First human joined — initializing AI ships for new round');
                     gameState.aiShips.clear();
                     initializeAIShips();
-                    // Immediately broadcast new state so clients see bots
                     broadcastGameState();
                 }
 
-                // Create new player (accept optional gameName)
                 const shipData = SHIP_CLASSES[0];
                 const player = {
                     id: playerId,
-                    // Spawn players anywhere within world bounds instead of a small area
                     x: (Math.random() * 2 - 1) * 3000,
                     y: (Math.random() * 2 - 1) * 3000,
                     angle: 0,
@@ -659,59 +722,219 @@ wss.on('connection', (ws) => {
                     fireTimer: 0,
                     isAI: false,
                     input: null,
-                    gameName: data.gameName || '',
-                    mineTimer: 0
+                    gameName: data.gameName ? String(data.gameName).trim().slice(0,30) : '',
+                    mineTimer: 0,
+                    inPlay: true,
+                    fleetCode: null
                 };
 
                 gameState.players.set(playerId, player);
 
-                ws.send(JSON.stringify({
-                    type: 'joined',
-                    playerId: playerId,
-                    player: player
-                }));
-
+                ws.send(JSON.stringify({ type: 'joined', playerId: playerId, player }));
                 console.log(`Player ${playerId} joined`);
+
+            // Fleet creation
+            } else if (data.type === 'createFleet') {
+                const name = data.gameName ? String(data.gameName).trim().slice(0,30) : '';
+                const code = generateFleetCode();
+                const fleet = { code, leaderId: playerId, members: new Map(), kills: 0, started: false };
+                fleet.members.set(playerId, { name });
+                // If the player entity already exists (joined), set their display name too
+                if (gameState.players.has(playerId)) {
+                    const p = gameState.players.get(playerId);
+                    p.gameName = name || p.gameName;
+                }
+                gameState.fleets.set(code, fleet);
+                ws.send(JSON.stringify({ type: 'fleetCreated', code, members: Array.from(fleet.members.entries()).map(([id, m]) => ({ id, name: m.name })), kills: fleet.kills }));
+                console.log(`Fleet ${code} created by ${playerId}`);
+
+            } else if (data.type === 'joinFleet') {
+                const code = data.code ? String(data.code).trim() : null;
+                const fleet = code && gameState.fleets.get(code);
+                if (!fleet) {
+                    ws.send(JSON.stringify({ type: 'fleetError', message: 'Fleet not found' }));
+                } else if (fleet.started) {
+                    ws.send(JSON.stringify({ type: 'fleetError', message: 'Fleet already started' }));
+                } else if (fleet.members.size >= 4) {
+                    // Enforce max 4 players per fleet
+                    ws.send(JSON.stringify({ type: 'fleetError', message: 'Fleet is full (max 4 players)' }));
+                } else {
+                    const name = data.gameName ? String(data.gameName).trim().slice(0,30) : '';
+                    fleet.members.set(playerId, { name });
+
+                    // If the player is already a joined player entity, update their gameName
+                    if (gameState.players.has(playerId)) {
+                        const p = gameState.players.get(playerId);
+                        p.gameName = name || p.gameName;
+                    }
+
+                    // respond to the joining member with current list and kills
+                    ws.send(JSON.stringify({ type: 'fleetJoined', code, members: Array.from(fleet.members.entries()).map(([id, m]) => ({ id, name: m.name })), kills: fleet.kills }));
+
+                    // notify leader with updated member list and kills
+                    const leaderWs = connByPlayerId.get(fleet.leaderId);
+                    if (leaderWs && leaderWs.readyState === WebSocket.OPEN) {
+                        leaderWs.send(JSON.stringify({ type: 'fleetUpdate', code, members: Array.from(fleet.members.entries()).map(([id, m]) => ({ id, name: m.name })), kills: fleet.kills, leaderId: fleet.leaderId }));
+                    }
+
+                    console.log(`Player ${playerId} joined fleet ${code}`);
+                }
+
+            } else if (data.type === 'leaveFleet') {
+                const code = data.code;
+                const fleet = gameState.fleets.get(code);
+                if (fleet && fleet.members.has(playerId)) {
+                    fleet.members.delete(playerId);
+                    ws.send(JSON.stringify({ type: 'fleetLeft', code }));
+                    if (fleet.leaderId === playerId || fleet.members.size === 0) {
+                        gameState.fleets.delete(code);
+                        for (const [mid] of fleet.members) {
+                            const mws = connByPlayerId.get(mid);
+                            if (mws && mws.readyState === WebSocket.OPEN) mws.send(JSON.stringify({ type: 'fleetClosed', code }));
+                        }
+                    }
+                } else {
+                    ws.send(JSON.stringify({ type: 'fleetError', message: 'Not in fleet' }));
+                }
+
+            } else if (data.type === 'startFleet') {
+                const code = data.code;
+                const fleet = gameState.fleets.get(code);
+                if (!fleet) {
+                    ws.send(JSON.stringify({ type: 'fleetError', message: 'Fleet not found' }));
+                } else if (fleet.leaderId !== playerId) {
+                    ws.send(JSON.stringify({ type: 'fleetError', message: 'Only leader can start the fleet' }));
+                } else {
+                    console.log(`Starting fleet ${code} by ${playerId}`);
+                    // Respawn AI if needed
+                    const anyHumanPlaying = Array.from(gameState.players.values()).some(p => p.inPlay);
+                    if (!anyHumanPlaying) {
+                        gameState.aiShips.clear();
+                        initializeAIShips();
+                    }
+
+                    // Spawn or mark members in game
+                    for (const [mid, meta] of fleet.members) {
+                        const memberWs = connByPlayerId.get(mid);
+                        if (!gameState.players.has(mid)) {
+                            const shipData = SHIP_CLASSES[0];
+                            const p = {
+                                id: mid,
+                                x: (Math.random() * 2 - 1) * 3000,
+                                y: (Math.random() * 2 - 1) * 3000,
+                                angle: 0,
+                                velocityX: 0,
+                                velocityY: 0,
+                                data: shipData,
+                                health: shipData.health,
+                                maxHealth: shipData.health,
+                                xp: 0,
+                                kills: 0,
+                                score: 0,
+                                fireTimer: 0,
+                                isAI: false,
+                                input: null,
+                                gameName: meta && meta.name ? meta.name : '',
+                                mineTimer: 0,
+                                inPlay: true,
+                                fleetCode: code
+                            };
+                            gameState.players.set(mid, p);
+                            if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+                                memberWs.send(JSON.stringify({ type: 'joined', playerId: mid, player: p }));
+                            }
+                            console.log(`Fleet member ${mid} spawned for fleet ${code}`);
+                        } else {
+                            const existing = gameState.players.get(mid);
+                            existing.inPlay = true;
+                            existing.fleetCode = code;
+                            // Ensure display name from fleet meta is applied if present
+                            if (meta && meta.name) existing.gameName = meta.name || existing.gameName;
+                            if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+                                memberWs.send(JSON.stringify({ type: 'fleetStarted', code }));
+                            }
+                        }
+                    }
+
+                    // Notify all fleet members that the fleet has started (so they can hide start screen)
+                    for (const [mid] of fleet.members) {
+                        const mws = connByPlayerId.get(mid);
+                        if (mws && mws.readyState === WebSocket.OPEN) {
+                            try {
+                                mws.send(JSON.stringify({ type: 'fleetStarted', code }));
+                            } catch (e) { /* ignore */ }
+                        }
+                    }
+
+                    // Mark fleet as started and keep it so we can track fleet kills during play
+                    fleet.started = true;
+
+                    // Broadcast new state to everyone
+                    broadcastGameState();
+                }
+
             } else if (data.type === 'input') {
-                // Update player input
-                const player = gameState.players.get(playerId);
-                if (player) {
-                    player.input = data.input;
-                    // Handle mine deployment (spacebar) with cooldown to prevent spam
-                    if (data.deployMine) {
-                        player.mineTimer = player.mineTimer || 0;
-                        if (player.mineTimer <= 0) {
-                            deployMine(player);
-                            player.mineTimer = 1.5; // 1.5s cooldown between deployments
+                    // Update player input
+                    const player = gameState.players.get(playerId);
+                    if (player) {
+                        player.input = data.input;
+                        // Handle mine deployment (spacebar) with cooldown to prevent spam
+                        if (data.deployMine) {
+                            player.mineTimer = player.mineTimer || 0;
+                            if (player.mineTimer <= 0) {
+                                deployMine(player);
+                                player.mineTimer = 1.5; // 1.5s cooldown between deployments
+                            }
+                        }
+                    }
+
+                } else if (data.type === 'restart') {
+                    // Player requested a restart: reset AI population to initial set
+                    console.log(`Restart requested by ${playerId}`);
+                    gameState.aiShips.clear();
+                    initializeAIShips();
+                    // Immediately broadcast new state so clients update UI
+                    broadcastGameState();
+                } else if (data.type === 'refillBots') {
+                    // Player requested to refill bots (on join battle)
+                    console.log(`Refill bots requested by ${playerId}`);
+                    gameState.aiShips.clear();
+                    initializeAIShips();
+                    // Immediately broadcast new state so clients update UI
+                    broadcastGameState();
+                }
+            } catch (error) {
+                console.error('Error processing message:', error);
+            }
+        });
+        
+        ws.on('close', () => {
+            // Remove mapping
+            connByPlayerId.delete(playerId);
+
+            // Remove from any fleet membership
+            for (const [code, fleet] of Array.from(gameState.fleets.entries())) {
+                if (fleet.members.has(playerId)) {
+                    fleet.members.delete(playerId);
+                    // If leader left or fleet empty, dissolve
+                    if (fleet.leaderId === playerId || fleet.members.size === 0) {
+                        gameState.fleets.delete(code);
+                        for (const [mid] of fleet.members) {
+                            const mws = connByPlayerId.get(mid);
+                            if (mws && mws.readyState === WebSocket.OPEN) mws.send(JSON.stringify({ type: 'fleetClosed', code }));
                         }
                     }
                 }
-            } else if (data.type === 'restart') {
-                // Player requested a restart: reset AI population to initial set
-                console.log(`Restart requested by ${playerId}`);
-                gameState.aiShips.clear();
-                initializeAIShips();
-                // Immediately broadcast new state so clients update UI
-                broadcastGameState();
-            } else if (data.type === 'refillBots') {
-                // Player requested to refill bots (on join battle)
-                console.log(`Refill bots requested by ${playerId}`);
-                gameState.aiShips.clear();
-                initializeAIShips();
-                // Immediately broadcast new state so clients update UI
-                broadcastGameState();
             }
-        } catch (error) {
-            console.error('Error processing message:', error);
-        }
-    });
-    
-    ws.on('close', () => {
-        gameState.players.delete(playerId);
-        console.log(`Player ${playerId} disconnected`);
-    });
-});
 
+            // Remove player from active game if present
+            if (gameState.players.has(playerId)) {
+                gameState.players.delete(playerId);
+            }
+
+            console.log(`Player ${playerId} disconnected`);
+        });
+    });
 // Initialize game
 initializeAIShips();
 

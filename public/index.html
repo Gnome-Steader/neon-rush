@@ -199,16 +199,89 @@
             text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
             pointer-events: none;
         }
+
+        /* --- Touch / Mobile Controls --- */
+        #touchControls { display: none; }
+
+        @media (pointer: coarse), (max-width: 900px) {
+            #touchControls { display: block; pointer-events: auto; z-index: 60; }
+            #joystickContainer {
+                position: fixed;
+                left: 16px;
+                bottom: 110px;
+                width: 120px;
+                height: 120px;
+                border-radius: 60px;
+                background: rgba(0,0,0,0.25);
+                border: 2px solid rgba(0,150,255,0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                touch-action: none;
+            }
+
+            #joystickBase {
+                position: absolute;
+                width: 88px;
+                height: 88px;
+                border-radius: 44px;
+                background: rgba(0,0,0,0.35);
+            }
+
+            #joystickKnob {
+                position: absolute;
+                width: 44px;
+                height: 44px;
+                border-radius: 22px;
+                background: linear-gradient(135deg,#00ff88,#0096ff);
+                transform: translate(0px,0px);
+                transition: transform 0.05s linear;
+                box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+            }
+
+            .touch-btn {
+                -webkit-tap-highlight-color: transparent;
+                appearance: none;
+                border: none;
+                background: linear-gradient(135deg,#ff6b00,#ff9500);
+                color: #000;
+                font-weight: 700;
+                padding: 12px 16px;
+                border-radius: 12px;
+                min-width: 64px;
+                text-align: center;
+                box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+                touch-action: manipulation;
+            }
+
+            #muteBtn { display: block; }
+        }
+
+        /* Accessibility focus styles */
+        button:focus, .ui-element:focus {
+            outline: 3px dashed rgba(0,255,136,0.6);
+            outline-offset: 4px;
+        }
     </style>
 </head>
 <body>
     <div id="startScreen" class="ui-element">
         <h1>NAVAL WAR</h1>
         <p style="margin-bottom: 12px; opacity: 0.9;">Multiplayer Naval Combat!</p>
-        <input id="gameNameInput" placeholder="Enter game name (optional)" style="padding:10px;border-radius:8px;border:1px solid #0096ff;margin-bottom:10px;width:280px;text-align:center;">
+        <input id="gameNameInput" maxlength="30" placeholder="Enter game name (optional, max 30 chars)" style="padding:10px;border-radius:8px;border:1px solid #0096ff;margin-bottom:10px;width:280px;text-align:center;">
         <div style="display:flex;gap:10px;align-items:center;">
             <button id="startBtn">JOIN BATTLE</button>
             <button id="howBtn" style="background: rgba(255,255,255,0.06); border: 1px solid #0096ff; color: #fff; padding:8px 12px; border-radius:8px;">How to Play</button>
+        </div>
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+            <button id="createFleetBtn" style="background:#007acc;color:#fff;padding:8px 10px;border-radius:6px;border:none;">Create Fleet</button>
+            <input id="fleetCodeInput" placeholder="Enter fleet code" maxlength="6" style="padding:8px;border-radius:6px;border:1px solid #0096ff;width:140px;text-align:center;">
+            <button id="joinFleetBtn" style="background:rgba(255,255,255,0.06); border: 1px solid #0096ff; color: #fff; padding:8px 10px; border-radius:6px;">Join Fleet</button>
+            <span id="fleetStatus" style="margin-left:8px;color:#00ff88;font-weight:600"></span>
+        </div>
+        <div id="fleetPanel" style="margin-top:8px; display:block; color:#00ff88;">
+            <div id="fleetMembers" style="font-size:14px; margin-top:6px;"></div>
+            <div id="fleetKillsDisplay" style="font-size:14px; margin-top:6px; display:none;"></div>
         </div>
 
         <div id="howModal" style="display:none; position: absolute; inset: 20% 20%; background: rgba(0,0,0,0.9); border: 2px solid #0096ff; padding: 20px; border-radius: 10px; z-index: 200;">
@@ -217,7 +290,9 @@
                 <li>Mouse: Aim & Turn</li>
                 <li>W/↑: Forward — S/↓: Reverse</li>
                 <li>Click: Fire — Space: Special</li>
-                <li>Destroy enemies to gain XP and tier up</li>
+                <li>Touch: Tap & drag on the right side to aim; tap Fire to shoot</li>
+                <li>Left side joystick: move forward/reverse and steer</li>
+                <li>Destroy enemies to tier up on each kill</li>
             </ul>
             <button id="closeHow" style="margin-top:12px; padding:8px 12px; border-radius:8px;">Close</button>
         </div>
@@ -235,13 +310,7 @@
                 <span id="shipClass">-</span>
                 <span class="tier-badge">T1</span>
             </div>
-            <div class="stat-row">
-                <span>XP:</span>
-                <span id="xp">0 / 100</span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="xpBar" style="width: 0%"></div>
-            </div>
+
             <div class="stat-row">
                 <span>Kills:</span>
                 <span id="kills">0</span>
@@ -257,6 +326,10 @@
             <div class="stat-row">
                 <span>Mine CD:</span>
                 <span id="mineCD">Ready</span>
+            </div>
+            <div class="stat-row">
+                <span>Fleet Kills:</span>
+                <span id="fleetKills"></span>
             </div>
         </div>
 
@@ -289,6 +362,21 @@
             <h3>LEADERBOARD</h3>
             <div id="leaderboardList"></div>
         </div>
+
+        <!-- Mobile / Touch Controls (left joystick + action buttons) -->
+        <div id="touchControls" class="ui-element" aria-hidden="false">
+            <div id="joystickContainer" aria-label="Movement joystick" role="application" tabindex="0" aria-describedby="joystickDesc">
+                <div id="joystickBase"></div>
+                <div id="joystickKnob"></div>
+            </div>
+            <div id="touchActions" style="position:fixed;right:16px;bottom:110px;display:flex;flex-direction:column;gap:12px;">
+                <button id="touchFireBtn" class="touch-btn" aria-label="Fire" aria-pressed="false">Fire</button>
+                <button id="touchMineBtn" class="touch-btn" aria-label="Deploy Mine" aria-pressed="false">Mine</button>
+            </div>
+            <button id="muteBtn" class="ui-element" aria-label="Toggle mute" aria-pressed="false" style="position:fixed;top:12px;right:12px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,0.6);border:1px solid #0096ff;color:#fff;z-index:50;display:none;">🔊</button>
+            <div id="joystickDesc" style="display:none">Left control joystick for movement. Slide up to move forward, down to reverse, left/right to steer.</div>
+        </div>
+
         <!-- Win overlay shown when the local player is the last one standing -->
         <div id="winOverlay" class="ui-element" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:20; pointer-events:auto;">
             <div style="background:rgba(0,0,0,0.85); padding:28px; border-radius:12px; border:2px solid #00ff88; text-align:center; min-width:280px;">
@@ -426,6 +514,11 @@
             pageHidden = document.hidden;
         });
 
+        // Fleet state / pending payload for connect
+        let pendingPayload = null;
+        let myFleetCode = null;
+        let isFleetLeader = false;
+
         // Connect to server
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -437,11 +530,12 @@
                 console.log('Connected to server');
                 document.getElementById('connectionStatus').textContent = 'Connected';
                 document.getElementById('connectionStatus').className = 'ui-element connected';
-                
-                // Send join message (include game name if provided)
-                const joinPayload = { type: 'join' };
-                if (chosenGameName && chosenGameName.length) joinPayload.gameName = chosenGameName;
-                ws.send(JSON.stringify(joinPayload));
+
+                // If we have an action waiting (create/join/start), send it
+                if (pendingPayload) {
+                    ws.send(JSON.stringify(pendingPayload));
+                    pendingPayload = null;
+                }
             };
             
             ws.onmessage = (event) => {
@@ -461,6 +555,123 @@
                     // Check for win condition (local player is last one standing) and death
                     try { checkForWin(); } catch (e) {}
                     try { checkForDeath(); } catch (e) {}
+
+                    // keep latest fleet kills display up to date if in a fleet (start screen and in-game stats)
+                    if (myPlayerId && gameState.players) {
+                        // Assign bot-style names to players who provided blank names (empty or spaces)
+                        (function ensurePlayerNames() {
+                            const Namer = ["PixelPouncer", "TurboNoodle", "ShadowSprinter", "CosmicCrab", "NeonNacho",
+    "FrostByteBandit", "LavaLlama", "QuantumQuokka", "SneakySpoon", "AstroMunch",
+    "GlitchGoblin", "ThunderMuffin", "RoboRaccoon", "MysticMarshmallow", "TurboTadpole",
+    "ByteBard", "ChaosChurro", "PhantomPickle", "NovaNibbler",
+
+    // +100 new names
+    "CircuitSquirrel", "NebulaNugget", "WobbleWombat", "StaticSalsa",
+    "MegaMarmot", "PixelPancake", "RiftRaptor", "TurboTurnip",
+    "QuantumYeti", "SizzleSasquatch", "GigaGopher", "AstroAnchovy",
+    "ChaosCactus", "FuzzyFalcon", "NoodleNarwhal", "VortexVulture",
+    "BinaryBiscuit", "CosmicCorgi", "SneakySardine", "RoboRadish",
+    "MysticMango", "ThunderTurnip", "GlitchGiraffe", "NovaNoodle",
+    "TurboTofu", "PixelPiranha", "LunarLobster", "StaticStingray",
+    "CosmoCabbage", "RiftRabbit", "MegaMuffin", "NebulaNectar",
+    "FrostFerret", "QuantumQuail", "AstroAvocado", "ChaosCranberry",
+    "PhantomPudding", "GigaGummy", "TurboTurtle", "PixelPopsicle",
+    "ShadowSundae", "CosmicCantaloupe", "NeonNectarine", "FrostFritter",
+    "LavaLatte", "QuantumQuiver", "SneakyScone", "AstroAlpaca",
+    "GlitchGnocchi", "ThunderTangerine", "RoboRutabaga", "MysticMoth",
+    "TurboTaffy", "ByteBuffalo", "ChaosCoconut", "PhantomPuffin",
+    "NovaNoodlefish", "CircuitCoyote", "NebulaNoodle", "WobbleWalrus",
+    "StaticSparrow", "MegaMango", "PixelPuffball", "RiftRaccoon",
+    "QuantumQuokkaPrime", "SizzleSalamander", "GigaGummybear", "AstroAntelope",
+    "ChaosChowder", "FuzzyFennec", "NoodleNighthawk", "VortexVole",
+    "BinaryBurrito", "CosmicCucumber", "SneakySushi", "RoboRaven",
+    "MysticMarmot", "ThunderTaco", "GlitchGuppy", "NovaNacho",
+    "TurboTarantula", "PixelPenguin", "LunarLynx", "StaticSquid",
+    "CosmoCoyote", "RiftRutabaga", "MegaMongoose", "NebulaNoodlefish",
+    "FrostFalafel", "QuantumQuasar", "AstroArtichoke", "ChaosCheeto",
+    "PhantomPancake", "GigaGorilla", "TurboTornado", "PixelPlatypus", "ShadowShark", "CosmicCicada", "NeonNewt", "FrostFennecFox",
+    "LavaLynx", "QuantumQuoll", "SneakySalmon", "AstroAardvark",
+    "GlitchGibbon", "ThunderTrout", "RoboRaccoonDog", "MysticManatee",
+    "TurboTriceratops", "ByteBeetle", "ChaosChameleon", "PhantomPika",
+    "NovaNumbat", "CircuitCrab", "NebulaNighthawk", "WobbleWeasel",
+    "StaticStarfish", "MegaMeerkat", "PixelPuffin", "RiftRhinoceros", "QuantumQuetzal", "SizzleSkunk", "GigaGecko", "AstroAxolotl", "ChaosCicada",
+    "FantasticFig", "MysticMantis", "TurboTapir", "PixelPlover"];
+                            gameState.players.forEach(p => {
+                                try {
+                                    if (!p || !p.id) return;
+                                    // Skip AI ships
+                                    if (p.id.startsWith && p.id.startsWith('ai_')) return;
+                                    if (!p.gameName || !p.gameName.toString().trim()) {
+                                        p.gameName = `${Namer[Math.floor(Math.random() * Namer.length)]}${Math.floor(Math.random() * 900) + 100}`;
+                                    }
+                                } catch (e) { /* ignore */ }
+                            });
+                        })();
+
+                        const me = gameState.players.find(p => p.id === myPlayerId);
+                        const fkStart = document.getElementById('fleetKillsDisplay');
+                        const fkStats = document.getElementById('fleetKills');
+
+                        // Only show fleet kills when the local player is actually in a fleet
+                        if (me && me.fleetCode) {
+                            const fleets = gameState.fleets || [];
+                            const f = fleets.find(ff => ff.code === me.fleetCode);
+                            if (fkStart) {
+                                fkStart.textContent = f ? `Fleet Kills: ${f.kills || 0}` : '';
+                                fkStart.style.display = '';
+                            }
+                            if (fkStats) fkStats.textContent = f ? `${f.kills || 0}` : '';
+                        } else {
+                            if (fkStart) {
+                                fkStart.textContent = '';
+                                fkStart.style.display = 'none';
+                            }
+                            if (fkStats) fkStats.textContent = '';
+                        }
+                    }
+
+                // Fleet events
+                } else if (data.type === 'fleetCreated') {
+                    myFleetCode = data.code;
+                    isFleetLeader = true;
+                    renderFleetMembers(data.members || [], data.kills || 0, data.leaderId || myPlayerId);
+                    const fs = document.getElementById('fleetStatus');
+                    if (fs) fs.textContent = `Fleet created: ${myFleetCode}`;
+                } else if (data.type === 'fleetJoined') {
+                    myFleetCode = data.code;
+                    isFleetLeader = false;
+                    renderFleetMembers(data.members || [], data.kills || 0, data.leaderId || null);
+                    const fs = document.getElementById('fleetStatus');
+                    if (fs) fs.textContent = `Joined fleet: ${myFleetCode}`;
+                } else if (data.type === 'fleetUpdate') {
+                    myFleetCode = data.code;
+                    renderFleetMembers(data.members || [], data.kills || 0, data.leaderId || null);
+                    const fs = document.getElementById('fleetStatus');
+                    if (fs) fs.textContent = `Fleet updated (${data.members.length} members)`;
+                } else if (data.type === 'fleetError') {
+                    const fs = document.getElementById('fleetStatus');
+                    if (fs) fs.textContent = `Fleet error: ${data.message}`;
+                } else if (data.type === 'fleetMemberUpdate') {
+                    // legacy single-member notify (fallback)
+                    const fs = document.getElementById('fleetStatus');
+                    if (fs) fs.textContent = `Member joined: ${data.memberId}`;
+                } else if (data.type === 'fleetLeft') {
+                    const fs = document.getElementById('fleetStatus'); if (fs) fs.textContent = `Left fleet ${data.code}`;
+                    // request updated list from leader if possible
+                } else if (data.type === 'fleetStarted') {
+                    const fs = document.getElementById('fleetStatus');
+                    if (fs) fs.textContent = `Fleet started: ${data.code}`;
+                    // Hide start screen for members once fleet started
+                    document.getElementById('startScreen').style.display = 'none';
+                    gameStarted = true; demoMode = false; gameStartTime = performance.now();
+                    // clear fleet panel UI since we're in-game
+                    const fm = document.getElementById('fleetMembers'); if (fm) fm.innerHTML = '';
+                    const fk = document.getElementById('fleetKillsDisplay'); if (fk) fk.textContent = '';
+                } else if (data.type === 'fleetClosed') {
+                    const fs = document.getElementById('fleetStatus');
+                    if (fs) fs.textContent = `Fleet closed: ${data.code}`;
+                    myFleetCode = null; isFleetLeader = false;
+                    renderFleetMembers([], 0, null);
                 }
             };
             
@@ -480,6 +691,36 @@
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
             };
+        }
+
+        // Render fleet member list and kills
+        function renderFleetMembers(members, kills, leaderId) {
+            const container = document.getElementById('fleetMembers');
+            const killsElem = document.getElementById('fleetKillsDisplay');
+            const statsElem = document.getElementById('fleetKills');
+            if (!container) return;
+            container.innerHTML = '';
+            if (!members || members.length === 0) {
+                container.innerHTML = '<em style="opacity:0.85">No fleet</em>';
+                if (killsElem) killsElem.textContent = '';
+                if (statsElem) statsElem.textContent = '';
+                return;
+            }
+            const list = document.createElement('div');
+            list.style.display = 'flex';
+            list.style.flexDirection = 'column';
+            list.style.gap = '4px';
+            members.forEach(m => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '8px';
+                row.textContent = `${m.name || m.id}` + (m.id === leaderId ? ' (Leader)' : '');
+                list.appendChild(row);
+            });
+            container.appendChild(list);
+            if (killsElem) killsElem.textContent = `Fleet Kills: ${kills || 0}`;
+            if (statsElem) statsElem.textContent = `${kills || 0}`;
         }
 
         // Send input to server
@@ -572,7 +813,15 @@
             
             // Draw label for other ships (human players and AI bots), except the local player
             if (!isPlayer) {
-                ctx.fillStyle = '#00ff88';
+                // color green when in your fleet, red otherwise
+                let labelColor = '#ff4444';
+                try {
+                    const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+                    const myFleet = myPlayer ? myPlayer.fleetCode : null;
+                    if (ship.fleetCode && myFleet && ship.fleetCode === myFleet) labelColor = '#00ff88';
+                } catch (e) { /* ignore */ }
+
+                ctx.fillStyle = labelColor;
                 ctx.font = 'bold 12px Arial';
                 ctx.textAlign = 'center';
                 const nameLabel = (ship.gameName && ship.gameName.length)
@@ -738,23 +987,29 @@
             [...gameState.players, ...gameState.aiShips].forEach(ship => {
                 const mx = mapX + (ship.x / worldSize + 1) * mapSize / 2;
                 const my = mapY + (ship.y / worldSize + 1) * mapSize / 2;
-                
-                if (ship.id === myPlayerId) {
-                    ctx.fillStyle = '#00ff88';
-                    ctx.beginPath();
-                    ctx.arc(mx, my, 4, 0, Math.PI * 2);
-                    ctx.fill();
-                } else if (!ship.id.startsWith('ai_')) {
-                    ctx.fillStyle = '#00aaff';
-                    ctx.beginPath();
-                    ctx.arc(mx, my, 3, 0, Math.PI * 2);
-                    ctx.fill();
-                } else {
-                    ctx.fillStyle = ship.data.tier >= 10 ? '#ff0000' : '#ff8888';
-                    ctx.beginPath();
-                    ctx.arc(mx, my, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+
+                // Determine color for humans vs AI and whether they're in your fleet
+                try {
+                    const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+                    if (ship.id === myPlayerId) {
+                        ctx.fillStyle = '#00ff88';
+                        ctx.beginPath();
+                        ctx.arc(mx, my, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (!ship.id.startsWith('ai_')) {
+                        const sameFleet = myPlayer && ship.fleetCode && myPlayer.fleetCode && ship.fleetCode === myPlayer.fleetCode;
+                        // If a human player is not in your fleet, show them as red; allied humans appear green
+                        ctx.fillStyle = sameFleet ? '#00ff88' : '#ff4444';
+                        ctx.beginPath();
+                        ctx.arc(mx, my, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        ctx.fillStyle = ship.data.tier >= 10 ? '#ff0000' : '#ff8888';
+                        ctx.beginPath();
+                        ctx.arc(mx, my, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } catch (e) { /* ignore drawing errors */ }
             });
         }
 
@@ -884,8 +1139,6 @@
             
             document.getElementById('shipClass').textContent = `${myPlayer.data.name}`;
             document.querySelector('.tier-badge').textContent = `T${myPlayer.data.tier}`;
-            document.getElementById('xp').textContent = `${myPlayer.xp} / ${myPlayer.data.xpRequired}`;
-            document.getElementById('xpBar').style.width = `${(myPlayer.xp / myPlayer.data.xpRequired) * 100}%`;
             document.getElementById('kills').textContent = myPlayer.kills;
             document.getElementById('score').textContent = myPlayer.score;
             document.getElementById('health').textContent = `${Math.ceil(myPlayer.health)}/${myPlayer.maxHealth}`;
@@ -893,6 +1146,33 @@
             
             const speedText = myPlayer.data.speed > 240 ? 'Fast' : myPlayer.data.speed > 180 ? 'Medium' : 'Slow';
             const firepowerText = myPlayer.data.firepower > 60 ? 'Heavy' : myPlayer.data.firepower > 30 ? 'Medium' : 'Light';
+
+            // Display fleet kills if the player is in a fleet
+            const fleetKillsElem = document.getElementById('fleetKills');
+            const fkDisplayEl = document.getElementById('fleetKillsDisplay');
+            if (fleetKillsElem) {
+                let fleetKillsText = '';
+                let fleetKillsStat = '';
+                if (myPlayer.fleetCode && gameState.fleets && gameState.fleets.length) {
+                    const f = gameState.fleets.find(ff => ff.code === myPlayer.fleetCode);
+                    if (f) {
+                        fleetKillsText = `Fleet Kills: ${f.kills || 0}`;
+                        fleetKillsStat = `${f.kills || 0}`;
+                    }
+                }
+                // HUD stat shows only the number
+                fleetKillsElem.textContent = fleetKillsStat;
+                // Start screen label only visible when in a fleet
+                if (fkDisplayEl) {
+                    if (fleetKillsText) {
+                        fkDisplayEl.textContent = fleetKillsText;
+                        fkDisplayEl.style.display = '';
+                    } else {
+                        fkDisplayEl.textContent = '';
+                        fkDisplayEl.style.display = 'none';
+                    }
+                }
+            }
             
             document.getElementById('speed').textContent = speedText;
             document.getElementById('firepower').textContent = firepowerText;
@@ -914,7 +1194,16 @@
                 const isMe = ship.id === myPlayerId;
                 // Use the provided gameName when available
                 const label = isMe ? 'YOU' : (ship.gameName && ship.gameName.length ? ship.gameName : (isPlayer ? 'Player' : 'AI'));
-                const color = isMe ? '#00ff88' : isPlayer ? '#00aaff' : '#ffff88';
+
+                // Determine fleet relation (green if same fleet, red otherwise)
+                let color = '#ff4444'; // default red for others / AI
+                try {
+                    const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+                    const myFleet = myPlayer ? myPlayer.fleetCode : null;
+                    if (isMe) color = '#00ff88';
+                    else if (ship.fleetCode && myFleet && ship.fleetCode === myFleet) color = '#00ff88';
+                } catch (e) { /* ignore */ }
+
                 return `<div style="color: ${color}; margin: 5px 0;">
                     ${i + 1}. ${label} - ${ship.score || 0}
                 </div>`;
@@ -1082,19 +1371,238 @@
             keys[e.key] = false;
         });
 
+        // --- Touch controls & accessibility enhancements ---
+        (function setupTouchControls(){
+            const joystick = document.getElementById('joystickContainer');
+            const knob = document.getElementById('joystickKnob');
+            const fireBtn = document.getElementById('touchFireBtn');
+            const mineBtn = document.getElementById('touchMineBtn');
+            const muteBtn = document.getElementById('muteBtn');
+
+            let joystickCenter = {x:0,y:0, radius: 50};
+
+            function updateJoystickVisual(dx,dy){
+                const dist = Math.min(Math.hypot(dx,dy), joystickCenter.radius);
+                const angle = Math.atan2(dy,dx);
+                knob.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+            }
+            function resetJoystick(){
+                knob.style.transform = 'translate(0px, 0px)';
+                keys['w'] = false; keys['s'] = false;
+            }
+            function computeCenter(){
+                if (!joystick) return;
+                const rect = joystick.getBoundingClientRect();
+                joystickCenter.x = rect.left + rect.width/2;
+                joystickCenter.y = rect.top + rect.height/2;
+                joystickCenter.radius = rect.width/2 - 8;
+            }
+            computeCenter();
+            window.addEventListener('resize', computeCenter);
+
+            if (joystick) {
+                joystick.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    computeCenter();
+                    const t = e.changedTouches[0];
+                    const dx = t.clientX - joystickCenter.x;
+                    const dy = t.clientY - joystickCenter.y;
+                    updateJoystickVisual(dx,dy);
+                    keys['w'] = dy < -10;
+                    keys['s'] = dy > 10;
+                    const angle = Math.atan2(dy, dx);
+                    mouse.x = canvas.width/2 + Math.cos(angle)*200;
+                    mouse.y = canvas.height/2 + Math.sin(angle)*200;
+                }, {passive:false});
+
+                joystick.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const t = Array.from(e.changedTouches).find(t => true);
+                    if (!t) return;
+                    const dx = t.clientX - joystickCenter.x;
+                    const dy = t.clientY - joystickCenter.y;
+                    updateJoystickVisual(dx,dy);
+                    keys['w'] = dy < -10;
+                    keys['s'] = dy > 10;
+                    const angle = Math.atan2(dy, dx);
+                    mouse.x = canvas.width/2 + Math.cos(angle)*200;
+                    mouse.y = canvas.height/2 + Math.sin(angle)*200;
+                }, {passive:false});
+
+                joystick.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    resetJoystick();
+                }, {passive:false});
+            }
+
+            // canvas touch aims and fire when touching right half
+            canvas.addEventListener('touchstart', (e) => {
+                if (!e.changedTouches) return;
+                const t = e.changedTouches[0];
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                if (el && (el.id === 'joystickContainer' || el.id === 'touchFireBtn' || el.id === 'touchMineBtn' || el.id === 'muteBtn')) return;
+                mouse.x = t.clientX;
+                mouse.y = t.clientY;
+                mouse.clicking = true;
+            }, {passive:false});
+
+            canvas.addEventListener('touchmove', (e) => {
+                const t = e.changedTouches[0];
+                if (!t) return;
+                mouse.x = t.clientX;
+                mouse.y = t.clientY;
+            }, {passive:false});
+
+            canvas.addEventListener('touchend', (e) => {
+                mouse.clicking = false;
+            }, {passive:false});
+
+            // Action buttons
+            if (fireBtn) {
+                fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); mouse.clicking = true; fireBtn.setAttribute('aria-pressed','true'); }, {passive:false});
+                fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); mouse.clicking = false; fireBtn.setAttribute('aria-pressed','false'); }, {passive:false});
+            }
+            if (mineBtn) {
+                mineBtn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[' '] = true; mineBtn.setAttribute('aria-pressed','true'); }, {passive:false});
+                mineBtn.addEventListener('touchend', (e) => { e.preventDefault(); keys[' '] = false; mineBtn.setAttribute('aria-pressed','false'); }, {passive:false});
+            }
+
+            // Mute toggle (flag only)
+            let audioMuted = false;
+            function updateMuteBtn(){
+                if (!muteBtn) return;
+                muteBtn.textContent = audioMuted ? '🔇' : '🔊';
+                muteBtn.setAttribute('aria-pressed', audioMuted ? 'true' : 'false');
+            }
+            if (muteBtn) {
+                muteBtn.addEventListener('click', () => { audioMuted = !audioMuted; updateMuteBtn(); });
+                muteBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); audioMuted = !audioMuted; updateMuteBtn(); } });
+            }
+
+            // key 'm' to toggle mute
+            window.addEventListener('keydown', (e) => {
+                if (e.key && e.key.toLowerCase() === 'm') { audioMuted = !audioMuted; updateMuteBtn(); }
+            });
+        })();
+
+        // Accessibility small improvements
+        (function accessibilityImprovements(){
+            const startBtnEl = document.getElementById('startBtn');
+            const howBtnEl = document.getElementById('howBtn');
+            const howModal = document.getElementById('howModal');
+            const conn = document.getElementById('connectionStatus');
+            if (startBtnEl) { startBtnEl.setAttribute('aria-label','Join battle'); startBtnEl.setAttribute('tabindex','0'); }
+            if (howBtnEl) { howBtnEl.setAttribute('aria-label','How to play'); howBtnEl.setAttribute('tabindex','0'); }
+            if (howModal) {
+                howModal.setAttribute('role','dialog');
+                howModal.setAttribute('aria-modal','true');
+            }
+            if (conn) {
+                conn.setAttribute('role','status');
+                conn.setAttribute('aria-live','polite');
+            }
+        })();
+
         document.getElementById('startBtn').addEventListener('click', () => {
             const nameInput = document.getElementById('gameNameInput');
-            chosenGameName = nameInput ? nameInput.value.trim() : '';
-            document.getElementById('startScreen').style.display = 'none';
-            gameStarted = true;
-            gameStartTime = performance.now();
-            demoMode = false;
-            connect();
+            chosenGameName = nameInput ? nameInput.value.trim().slice(0,30) : '';
+
+            // If player has a fleet
+            if (myFleetCode && isFleetLeader) {
+                // leader: start the fleet — ensure connected
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    pendingPayload = { type: 'startFleet', code: myFleetCode };
+                    connect();
+                } else {
+                    ws.send(JSON.stringify({ type: 'startFleet', code: myFleetCode }));
+                }
+                const fs = document.getElementById('fleetStatus'); if (fs) fs.textContent = `Starting fleet ${myFleetCode}...`;
+                // Hide start screen now since leader started
+                document.getElementById('startScreen').style.display = 'none';
+                gameStarted = true; demoMode = false; gameStartTime = performance.now();
+
+            } else if (myFleetCode && !isFleetLeader) {
+                // Member: wait for leader to start
+                const fs = document.getElementById('fleetStatus'); if (fs) fs.textContent = `Waiting for leader to start (code ${myFleetCode})`;
+                // do not hide start screen yet
+            } else {
+                // regular solo join
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    pendingPayload = { type: 'join', gameName: chosenGameName };
+                    connect();
+                } else {
+                    ws.send(JSON.stringify({ type: 'join', gameName: chosenGameName }));
+                }
+                document.getElementById('startScreen').style.display = 'none';
+                gameStarted = true; demoMode = false; gameStartTime = performance.now();
+            }
 
             // update header display with game name
             const status = document.getElementById('connectionStatus');
             if (status) {
                 status.textContent = chosenGameName ? `Connected - ${chosenGameName}` : 'Connected';
+            }
+        });
+
+        document.getElementById('createFleetBtn').addEventListener('click', () => {
+            // Prompt for display name before creating fleet (leader UX)
+            let modal = document.getElementById('createFleetModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'createFleetModal';
+                modal.style = 'position:absolute; inset:30% 20%; background:rgba(0,0,0,0.95); border:2px solid #0096ff; padding:16px; border-radius:8px; z-index:300;';
+                modal.innerHTML = `<h3 style="color:#00ff88; margin-top:0;">Enter display name for fleet (leader)</h3><input id="createFleetNameInput" maxlength="30" placeholder="Display name (max 30)" style="width:100%; padding:8px; border-radius:6px; border:1px solid #0096ff; margin-bottom:8px;"> <div style="display:flex; gap:8px; justify-content:flex-end;"><button id="createFleetConfirm" style="padding:8px 10px;">Create</button><button id="createFleetCancel" style="padding:8px 10px;">Cancel</button></div>`;
+                document.body.appendChild(modal);
+                document.getElementById('createFleetCancel').addEventListener('click', () => { modal.remove(); });
+                document.getElementById('createFleetConfirm').addEventListener('click', () => {
+                    const name = (document.getElementById('createFleetNameInput') || {}).value.trim().slice(0,30) || '';
+                    modal.remove();
+                    chosenGameName = name;
+                    const status = document.getElementById('connectionStatus');
+                    if (status) status.textContent = chosenGameName ? `Connected - ${chosenGameName}` : 'Connected';
+                    // send createFleet (queue if not open)
+                    if (!ws || ws.readyState !== WebSocket.OPEN) {
+                        pendingPayload = { type: 'createFleet', gameName: name };
+                        connect();
+                    } else {
+                        ws.send(JSON.stringify({ type: 'createFleet', gameName: name }));
+                    }
+                    const fs = document.getElementById('fleetStatus'); if (fs) fs.textContent = 'Creating fleet...';
+                });
+            }
+        });
+
+        // Show modal to ask for display name before joining
+        document.getElementById('joinFleetBtn').addEventListener('click', () => {
+            const code = (document.getElementById('fleetCodeInput') || {}).value.trim();
+            if (!code || code.length !== 6) {
+                const fs = document.getElementById('fleetStatus'); if (fs) fs.textContent = 'Enter a 6-digit fleet code.';
+                return;
+            }
+
+            // Create and show modal
+            let modal = document.getElementById('joinFleetModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'joinFleetModal';
+                modal.style = 'position:absolute; inset:30% 20%; background:rgba(0,0,0,0.95); border:2px solid #0096ff; padding:16px; border-radius:8px; z-index:300;';
+                modal.innerHTML = `<h3 style="color:#00ff88; margin-top:0;">Enter display name for fleet</h3><input id="joinFleetNameInput" maxlength="30" placeholder="Display name (max 30)" style="width:100%; padding:8px; border-radius:6px; border:1px solid #0096ff; margin-bottom:8px;"> <div style="display:flex; gap:8px; justify-content:flex-end;"><button id="joinFleetConfirm" style="padding:8px 10px;">Join</button><button id="joinFleetCancel" style="padding:8px 10px;">Cancel</button></div>`;
+                document.body.appendChild(modal);
+                document.getElementById('joinFleetCancel').addEventListener('click', () => { modal.remove(); });
+                document.getElementById('joinFleetConfirm').addEventListener('click', () => {
+                    const name = (document.getElementById('joinFleetNameInput') || {}).value.trim().slice(0,30) || '';
+                    modal.remove();
+                    chosenGameName = name;
+                    const status = document.getElementById('connectionStatus');
+                    if (status) status.textContent = chosenGameName ? `Connected - ${chosenGameName}` : 'Connected';
+                    const fs = document.getElementById('fleetStatus'); if (fs) fs.textContent = `Joining ${code}...`;
+                    if (!ws || ws.readyState !== WebSocket.OPEN) {
+                        pendingPayload = { type: 'joinFleet', code, gameName: name };
+                        connect();
+                    } else {
+                        ws.send(JSON.stringify({ type: 'joinFleet', code, gameName: name }));
+                    }
+                });
             }
         });
 
