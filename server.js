@@ -12,26 +12,46 @@ app.use(express.static('public'));
 
 // Game state
 const SHIP_CLASSES = [
-    { tier: 1, name: "Patrol Boat", variant: "Gunboat", speed: 240, armor: 20, firepower: 15, health: 100, color: "#4CAF50", size: 20, xpRequired: 100 },
-    { tier: 1, name: "Patrol Boat", variant: "Fast Attack", speed: 300, armor: 15, firepower: 12, health: 80, color: "#8BC34A", size: 18, xpRequired: 100 },
-    { tier: 2, name: "Mine Warfare", variant: "Mine Layer", speed: 150, armor: 30, firepower: 10, health: 150, color: "#795548", size: 25, xpRequired: 200 },
-    { tier: 2, name: "Mine Warfare", variant: "Mine Sweeper", speed: 180, armor: 25, firepower: 8, health: 130, color: "#8D6E63", size: 24, xpRequired: 200 },
-    { tier: 3, name: "Submarine", variant: "Attack Sub", speed: 210, armor: 35, firepower: 25, health: 200, color: "#37474F", size: 28, xpRequired: 350 },
-    { tier: 3, name: "Submarine", variant: "Stealth Sub", speed: 180, armor: 30, firepower: 20, health: 180, color: "#455A64", size: 26, xpRequired: 350 },
-    { tier: 4, name: "Torpedo Boat", variant: "Motor Torpedo", speed: 270, armor: 25, firepower: 35, health: 180, color: "#00BCD4", size: 24, xpRequired: 500 },
-    { tier: 5, name: "Destroyer", variant: "Guided Missile", speed: 210, armor: 40, firepower: 45, health: 300, color: "#2196F3", size: 32, xpRequired: 750 },
-    { tier: 5, name: "Destroyer", variant: "Anti-Sub", speed: 240, armor: 35, firepower: 40, health: 280, color: "#03A9F4", size: 30, xpRequired: 750 },
-    { tier: 6, name: "Frigate", variant: "ASW Frigate", speed: 210, armor: 45, firepower: 40, health: 350, color: "#3F51B5", size: 34, xpRequired: 1000 },
-    { tier: 7, name: "Corvette", variant: "Missile Corvette", speed: 240, armor: 38, firepower: 48, health: 320, color: "#673AB7", size: 30, xpRequired: 1300 },
-    { tier: 8, name: "Cruiser", variant: "Heavy Cruiser", speed: 180, armor: 60, firepower: 60, health: 500, color: "#9C27B0", size: 40, xpRequired: 1700 },
-    { tier: 9, name: "Battleship", variant: "Super Battleship", speed: 120, armor: 80, firepower: 85, health: 800, color: "#E91E63", size: 50, xpRequired: 2200 },
-    { tier: 10, name: "Aircraft Carrier", variant: "Fleet Carrier", speed: 150, armor: 70, firepower: 50, health: 1000, color: "#F44336", size: 60, xpRequired: 2800 },
-    { tier: 11, name: "Amphibious Assault", variant: "LHD", speed: 150, armor: 65, firepower: 55, health: 900, color: "#FF5722", size: 55, xpRequired: 3500 },
-    { tier: 12, name: "Support Vessel", variant: "Replenishment", speed: 120, armor: 50, firepower: 20, health: 700, color: "#FF9800", size: 45, xpRequired: 4000 },
-    { tier: 13, name: "Dreadnought", variant: "Nuclear", speed: 90, armor: 100, firepower: 100, health: 1200, color: "#FFC107", size: 65, xpRequired: 5000 },
-    { tier: 14, name: "Experimental", variant: "Railgun Cruiser", speed: 210, armor: 75, firepower: 120, health: 1000, color: "#00FFFF", size: 48, xpRequired: 7000 },
-    { tier: 15, name: "Command Ship", variant: "Flagship", speed: 150, armor: 90, firepower: 80, health: 1500, color: "#FFD700", size: 70, xpRequired: 10000 }
+    { tier: 1, name: "Patrol Boat", speed: 240, armor: 20, firepower: 15, health: 100, color: "#4CAF50", size: 20, xpRequired: 100 },
+    { tier: 1, name: "Patrol Boat", speed: 300, armor: 15, firepower: 12, health: 80, color: "#8BC34A", size: 18, xpRequired: 100 },
+    { tier: 2, name: "Mine Warfare", speed: 150, armor: 30, firepower: 10, health: 150, color: "#795548", size: 25, xpRequired: 200 },
+    { tier: 2, name: "Mine Warfare", speed: 180, armor: 25, firepower: 8, health: 130, color: "#8D6E63", size: 24, xpRequired: 200 },
+    { tier: 3, name: "Submarine", speed: 210, armor: 35, firepower: 25, health: 200, color: "#37474F", size: 28, xpRequired: 350 },
+    { tier: 3, name: "Submarine", speed: 180, armor: 30, firepower: 20, health: 180, color: "#455A64", size: 26, xpRequired: 350 },
+    { tier: 4, name: "Torpedo Boat", speed: 270, armor: 25, firepower: 35, health: 180, color: "#00BCD4", size: 24, xpRequired: 500 },
+    { tier: 5, name: "Destroyer", speed: 210, armor: 40, firepower: 45, health: 300, color: "#2196F3", size: 32, xpRequired: 750 },
+    { tier: 5, name: "Destroyer", speed: 240, armor: 35, firepower: 40, health: 280, color: "#03A9F4", size: 30, xpRequired: 750 },
+    { tier: 6, name: "Frigate", speed: 210, armor: 45, firepower: 40, health: 350, color: "#3F51B5", size: 34, xpRequired: 1000 },
+    { tier: 7, name: "Corvette", speed: 240, armor: 38, firepower: 48, health: 320, color: "#673AB7", size: 30, xpRequired: 1300 },
+    { tier: 8, name: "Cruiser", speed: 180, armor: 60, firepower: 60, health: 500, color: "#9C27B0", size: 40, xpRequired: 1700 },
+    { tier: 9, name: "Battleship", speed: 120, armor: 80, firepower: 85, health: 800, color: "#E91E63", size: 50, xpRequired: 2200 },
+    { tier: 10, name: "Aircraft Carrier", speed: 150, armor: 70, firepower: 50, health: 1000, color: "#F44336", size: 60, xpRequired: 2800 },
+    { tier: 11, name: "Amphibious Assault", speed: 150, armor: 65, firepower: 55, health: 900, color: "#FF5722", size: 55, xpRequired: 3500 },
+    { tier: 12, name: "Support Vessel", speed: 120, armor: 50, firepower: 20, health: 700, color: "#FF9800", size: 45, xpRequired: 4000 },
+    { tier: 13, name: "Dreadnought", speed: 90, armor: 100, firepower: 100, health: 1200, color: "#FFC107", size: 65, xpRequired: 5000 },
+    { tier: 14, name: "Experimental", speed: 210, armor: 75, firepower: 120, health: 1000, color: "#00FFFF", size: 48, xpRequired: 7000 },
+    { tier: 15, name: "Command Ship", speed: 150, armor: 90, firepower: 80, health: 1500, color: "#FFD700", size: 70, xpRequired: 10000 }
 ];
+
+// Ensure only one ship class per tier exists.
+// If multiple entries share the same tier, keep the LAST occurrence and remove earlier ones.
+(function dedupeShipClasses() {
+    const seen = new Set();
+    const deduped = [];
+    for (let i = SHIP_CLASSES.length - 1; i >= 0; i--) {
+        const s = SHIP_CLASSES[i];
+        if (!seen.has(s.tier)) {
+            deduped.push(s);
+            seen.add(s.tier);
+        } else {
+            // Log removal to help debugging during development
+            console.log(`ship_classes: removed duplicate tier ${s.tier}`);
+        }
+    }
+    deduped.reverse();
+    SHIP_CLASSES.length = 0;
+    SHIP_CLASSES.push(...deduped);
+})();
 
 const BOT_NAMES = [
     "PixelPouncer", "TurboNoodle", "ShadowSprinter", "CosmicCrab", "NeonNacho",
@@ -81,6 +101,7 @@ const gameState = {
     projectiles: [],
     effects: [],
     mines: [],
+    walls: [],
     nextAIId: 0,
     nextProjectileId: 0,
     nextMineId: 0,
@@ -89,6 +110,14 @@ const gameState = {
 
 // Fleets management (code -> { code, leaderId, members: Map(playerId -> meta) })
 gameState.fleets = new Map();
+
+// Storm mechanic configuration
+// At the start of a round the storm's safe circle radius begins at the map edge (WORLD_SIZE)
+// and slowly shrinks inward. Ships outside the safe radius take `damagePerSecond` damage.
+// This server-side authoritative object is updated each tick.
+gameState.storm = null;
+// track when the round started (used to avoid early win detection)
+gameState.roundStartTime = Date.now();
 
 // Map playerId -> WebSocket connection for direct notifications
 const connByPlayerId = new Map();
@@ -122,6 +151,25 @@ function isFriendly(attackerId, target) {
     return aCode && tCode && aCode === tCode;
 } 
 
+// Remove all mines owned by `ownerId` from the world
+function removeMinesForOwner(ownerId) {
+    if (!ownerId) return;
+    const removedMinePositions = [];
+    gameState.mines = gameState.mines.filter(m => {
+        if (m.ownerId === ownerId) {
+            removedMinePositions.push({ x: m.x, y: m.y });
+            return false;
+        }
+        return true;
+    });
+
+    // spawn small visual fragments where mines were removed (non-explosive)
+    for (const pos of removedMinePositions) {
+        gameState.effects.push({ id: `effect_${gameState.nextEffectId++}`, type: 'explosion_fragment', x: pos.x, y: pos.y, vx: (Math.random()-0.5)*40, vy: (Math.random()-0.5)*40, lifetime: 0.4 });
+    }
+}
+
+
 // Broadcast throttling to help with lag -- send updates every N ticks
 let __tickCounter = 0;
 const BROADCAST_EVERY = 2; // send state every 2 server ticks (~15 updates/sec)
@@ -131,6 +179,17 @@ const BROADCAST_EVERY = 2; // send state every 2 server ticks (~15 updates/sec)
 const MAX_EFFECTS = 500;
 const MAX_PROJECTILES = 400;
 const MAX_MINES = 500;
+
+// Bot mine-dodging configuration:
+// MINE_DODGE_CHANCE: probability (0-1) that a bot will attempt to dodge a nearby active mine
+// MINE_DODGE_DETECTION_RADIUS: how far (units) bots can 'see' mines to start dodge behavior
+const MINE_DODGE_CHANCE = 0.8;
+const MINE_DODGE_DETECTION_RADIUS = 500; 
+
+// World size (world extends from -WORLD_SIZE to WORLD_SIZE). Increase by 5x for larger maps.
+const WORLD_SIZE = 3000 * 5; // was 3000 (now 15000)
+
+
 
 // Generate unique ID
 function generateId(prefix) {
@@ -164,20 +223,192 @@ function createAIShip(x, y, tier = 1) {
         isAI: true,
         gameName: botName,
         mineTimer: Math.random() * 6,
+        avoidMineTimer: 0,
         targetAngle: Math.random() * Math.PI * 2,
         behaviorTimer: 0,
         targetId: null
-    };
+    }; 
     
     gameState.aiShips.set(id, ship);
     return ship;
 }
 
+// Helper: check if two axis-aligned rectangles (centered at x,y) overlap given padding
+function rectsOverlap(a, b, pad = 0) {
+    const ax1 = a.x - a.width / 2 - pad;
+    const ax2 = a.x + a.width / 2 + pad;
+    const ay1 = a.y - a.height / 2 - pad;
+    const ay2 = a.y + a.height / 2 + pad;
+
+    const bx1 = b.x - b.width / 2;
+    const bx2 = b.x + b.width / 2;
+    const by1 = b.y - b.height / 2;
+    const by2 = b.y + b.height / 2;
+
+    return !(ax2 < bx1 || ax1 > bx2 || ay2 < by1 || ay1 > by2);
+}
+
+// Resolve an entity (player or AI ship) against walls: authoritative push-out and velocity correction
+function resolveWallCollisionForEntity(entity) {
+    if (!entity || !entity.data) return;
+    const radius = (entity.data && entity.data.size) ? entity.data.size : 20;
+    try {
+        for (const w of gameState.walls) {
+            const res = circleRectCollision(entity.x, entity.y, radius, w);
+            if (res.collides) {
+                let dx = entity.x - res.nearestX;
+                let dy = entity.y - res.nearestY;
+                let dist = Math.hypot(dx, dy);
+                if (dist === 0) {
+                    // fallback: push out along smallest axis
+                    const left = w.x - w.width / 2;
+                    const right = w.x + w.width / 2;
+                    const top = w.y - w.height / 2;
+                    const bottom = w.y + w.height / 2;
+                    const pushLeft = Math.abs(entity.x - left);
+                    const pushRight = Math.abs(entity.x - right);
+                    const pushTop = Math.abs(entity.y - top);
+                    const pushBottom = Math.abs(entity.y - bottom);
+                    const minPush = Math.min(pushLeft, pushRight, pushTop, pushBottom);
+                    if (minPush === pushLeft) { dx = 1; dy = 0; dist = 1; }
+                    else if (minPush === pushRight) { dx = -1; dy = 0; dist = 1; }
+                    else if (minPush === pushTop) { dx = 0; dy = 1; dist = 1; }
+                    else { dx = 0; dy = -1; dist = 1; }
+                }
+
+                const overlap = radius - dist;
+                entity.x += (dx / dist) * overlap;
+                entity.y += (dy / dist) * overlap;
+
+                // Remove velocity component pushing into wall if entity has velocity
+                if (typeof entity.velocityX === 'number' && typeof entity.velocityY === 'number') {
+                    const nx = dx / (dist || 1);
+                    const ny = dy / (dist || 1);
+                    const vn = entity.velocityX * nx + entity.velocityY * ny;
+                    entity.velocityX -= vn * nx;
+                    entity.velocityY -= vn * ny;
+
+                    // damping to avoid jitter
+                    entity.velocityX *= 0.8;
+                    entity.velocityY *= 0.8;
+
+                    // Compute local normal and tangent (nx,ny already defined above)
+                    const tx1 = -ny, ty1 = nx;
+                    const tx2 = ny, ty2 = -nx;
+
+                    // Choose tangent more aligned with current motion to slide around the wall
+                    const vx = (typeof entity.velocityX === 'number') ? entity.velocityX : Math.cos(entity.angle || 0);
+                    const vy = (typeof entity.velocityY === 'number') ? entity.velocityY : Math.sin(entity.angle || 0);
+                    const dot1 = vx * tx1 + vy * ty1;
+                    const dot2 = vx * tx2 + vy * ty2;
+                    let chosenTx = dot1 >= dot2 ? tx1 : tx2;
+                    let chosenTy = dot1 >= dot2 ? ty1 : ty2;
+
+                    if (entity.isAI) {
+                        // Set AI targetAngle to follow the tangent around the obstacle
+                        let angle = Math.atan2(chosenTy, chosenTx);
+                        // small random jitter so bots don't always behave identically
+                        angle += (Math.random() - 0.5) * 0.6;
+                        entity.targetAngle = angle;
+
+                        // Also nudge velocity slightly along the tangent so they move away smoothly
+                        if (typeof entity.velocityX === 'number' && typeof entity.velocityY === 'number') {
+                            entity.velocityX += chosenTx * (Math.hypot(vx, vy) * 0.2 + 10);
+                            entity.velocityY += chosenTy * (Math.hypot(vx, vy) * 0.2 + 10);
+                        }
+                    } else {
+                        // For players, slide them along the tangent a bit so they feel like they're moving around
+                        entity.x += chosenTx * (overlap * 0.22);
+                        entity.y += chosenTy * (overlap * 0.22);
+                    }
+                }
+            }
+        }
+    } catch (e) { /* ignore */ }
+}
+
+// --- Collision helpers (used for authoritative wall collisions and projectile bounces) ---
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+// circle-rect collision: circle at (cx,cy) radius r, rect centered at rect.x,rect.y with width,height
+function circleRectCollision(cx, cy, r, rect) {
+    const left = rect.x - rect.width / 2;
+    const right = rect.x + rect.width / 2;
+    const top = rect.y - rect.height / 2;
+    const bottom = rect.y + rect.height / 2;
+    const nearestX = clamp(cx, left, right);
+    const nearestY = clamp(cy, top, bottom);
+    const dx = cx - nearestX;
+    const dy = cy - nearestY;
+    const dist2 = dx * dx + dy * dy;
+    return { collides: dist2 <= r * r, dx, dy, nearestX, nearestY };
+}
+
+function reflectVector(vx, vy, nx, ny) {
+    // n should be normalized
+    const dot = vx * nx + vy * ny;
+    const rx = vx - 2 * dot * nx;
+    const ry = vy - 2 * dot * ny;
+    return { x: rx, y: ry };
+}
+
+// Initialize a small set of non-overlapping bright yellow walls
+function initializeWalls() {
+    gameState.walls = [];
+
+    // Decide how many walls — increase density for more obstacles (10 to 24 walls)
+    const numWalls = 10 + Math.floor(Math.random() * 15);
+
+    // Smaller padding and varied sizes when more walls are present
+    const padding = 40; // minimal space between walls so they don't touch
+    const minSize = 80;
+    const maxSize = 600;
+
+    let attempts = 0;
+    for (let i = 0; i < numWalls && attempts < numWalls * 200; i++) {
+        attempts++;
+        const w = minSize + Math.floor(Math.random() * (maxSize - minSize));
+        const h = minSize + Math.floor(Math.random() * (maxSize - minSize));
+
+        // pick a random center position somewhere across the world (but avoid very near center)
+        const angle = Math.random() * Math.PI * 2;
+        const radius = (0.15 + Math.random() * 0.7) * WORLD_SIZE; // avoid very center and very edge
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+
+        const wall = { id: `wall_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, x, y, width: w, height: h };
+
+        // ensure it fits within world bounds
+        const halfW = w / 2;
+        const halfH = h / 2;
+        if (x - halfW < -WORLD_SIZE || x + halfW > WORLD_SIZE || y - halfH < -WORLD_SIZE || y + halfH > WORLD_SIZE) {
+            // try again
+            i--; if (attempts > 1000) break; else continue;
+        }
+
+        // ensure it does not overlap any existing wall (with padding)
+        let ok = true;
+        for (const other of gameState.walls) {
+            if (rectsOverlap(wall, other, padding)) { ok = false; break; }
+        }
+
+        if (ok) {
+            gameState.walls.push(wall);
+            attempts = 0; // reset attempts for next wall
+        } else {
+            // try another position for same wall
+            i--; if (attempts > 1000) break;
+        }
+    }
+}
+
+
+
 // Spawn initial AI ships
 function initializeAIShips() {
-    // Start with 20 AI ships placed uniformly at random across the world
-    const initialCount = 20;
-    const worldSize = 3000; // matches game world bounds
+    // Start with 40 AI ships placed uniformly at random across the world
+    const initialCount = 40;
+    const worldSize = WORLD_SIZE; // matches game world bounds
     for (let i = 0; i < initialCount; i++) {
         // Uniformly pick an (x,y) inside [-worldSize, worldSize]
         const x = (Math.random() * 2 - 1) * worldSize;
@@ -185,60 +416,123 @@ function initializeAIShips() {
         // Spawn all initial AI as tier 1 Patrol Boats
         createAIShip(x, y, 1);
     }
+
+    // Create walls for the round
+    initializeWalls();
+
+    // Initialize storm and round timer
+    gameState.roundStartTime = Date.now();
+    gameState.storm = {
+        x: 0, // centered at map (0,0)
+        y: 0,
+        safeRadius: WORLD_SIZE, // safe area starts at map edge
+        damagePerSecond: 10, // damage to ships that are outside the safe radius
+        // Increased speed: make the storm shrink 6× faster
+        shrinkRate: 48, // base units per second the safe radius shrinks inward (was 8)
+        baseShrinkRate: 48, // keep a base value for dynamic scaling (was 8)
+        shrinkMultiplier: 1, // smoothed multiplier applied to shrink rate
+        maxShrinkMultiplier: 2.0, // maximum multiplier when activity is low
+        shrinkAdjustWindowSec: 5, // how many seconds of recent damage to consider
+        lowDamageThreshold: 5, // total damage over window below which we speed up fully
+        highDamageThreshold: 20, // above this we don't speed up
+        active: true
+    };
+    // initialize damage events buffer (stores {ts, amount}) for recent activity checks
+    gameState.recentDamageEvents = [];
+    console.log(`Storm initialized with safeRadius=${gameState.storm.safeRadius}, damagePerSecond=${gameState.storm.damagePerSecond}, shrinkRate=${gameState.storm.shrinkRate}`);
+
 }
 
 // Update AI behavior
 function updateAI(ship, dt) {
     ship.behaviorTimer -= dt;
-    
+
+    // Bots with health > 40 become 'aggressive' — they retarget faster, search farther,
+    // prefer player targets and are more likely to fire / deploy mines.
+    const aggressive = ship.health > 40;
+
     if (ship.behaviorTimer <= 0) {
-        ship.behaviorTimer = 2 + Math.random() * 3;
-        
-        // Find closest target
+        // reduce how often even aggressive bots retarget to avoid runaway firing
+        ship.behaviorTimer = aggressive ? 1.2 + Math.random() * 2 : 2 + Math.random() * 3;
+
+        // Find closest target (consider both players and other AI so bots fight each other too)
         let closestDist = Infinity;
         ship.targetId = null;
-        
-        // Check players (ignore lobby players)
+        // shrink the aggressive detection radius slightly to avoid pulling in too many targets
+        const detectionRadius = aggressive ? 700 : 500;
+
+        // Consider human players
         gameState.players.forEach(player => {
             if (!player.inPlay) return;
             const dist = Math.hypot(player.x - ship.x, player.y - ship.y);
-            if (dist < closestDist && dist < 500) {
+            if (dist < closestDist && dist < detectionRadius) {
                 closestDist = dist;
                 ship.targetId = player.id;
             }
         });
-        
-        // Check other AI ships
+
+        // Also consider other AI ships (skip self) so bots will fight each other
         gameState.aiShips.forEach(otherShip => {
-            if (otherShip.id !== ship.id) {
-                const dist = Math.hypot(otherShip.x - ship.x, otherShip.y - ship.y);
-                if (dist < closestDist && dist < 500) {
-                    closestDist = dist;
-                    ship.targetId = otherShip.id;
-                }
+            if (otherShip.id === ship.id) return;
+            const dist = Math.hypot(otherShip.x - ship.x, otherShip.y - ship.y);
+            if (dist < closestDist && dist < detectionRadius) {
+                closestDist = dist;
+                ship.targetId = otherShip.id;
             }
         });
-        
-        if (!ship.targetId) {
+
+        // If still no target and aggressive, seek the nearest entity (player or AI) even if outside detectionRadius
+        if (!ship.targetId && aggressive) {
+            let nearestDist = Infinity;
+            let nearest = null;
+            gameState.players.forEach(player => {
+                if (!player.inPlay) return;
+                const dist = Math.hypot(player.x - ship.x, player.y - ship.y);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = player;
+                }
+            });
+            gameState.aiShips.forEach(otherShip => {
+                if (otherShip.id === ship.id) return;
+                const dist = Math.hypot(otherShip.x - ship.x, otherShip.y - ship.y);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = otherShip;
+                }
+            });
+            if (nearest) {
+                ship.targetId = nearest.id;
+            } else {
+                ship.targetAngle = Math.random() * Math.PI * 2;
+            }
+        } else if (!ship.targetId) {
             ship.targetAngle = Math.random() * Math.PI * 2;
         }
     }
-    
+
     // Find target
     let target = gameState.players.get(ship.targetId) || gameState.aiShips.get(ship.targetId);
-    
+
     if (target) {
         const dx = target.x - ship.x;
         const dy = target.y - ship.y;
         ship.targetAngle = Math.atan2(dy, dx);
-        
+
         const dist = Math.hypot(dx, dy);
-        if (dist < 300 && ship.fireTimer <= 0) {
+        // soften aggressive firing to avoid large projectile bursts
+        const fireRange = aggressive ? 450 : 300;
+
+        // Aggressive bots will fire at slightly longer ranges, but with a safer minimum cooldown
+        if (dist < fireRange && ship.fireTimer <= 0) {
             fireProjectile(ship);
+            if (aggressive) ship.fireTimer = Math.max(0.25, (1 - (ship.data.tier * 0.05)) * 0.5);
         }
 
         // AI may deploy mines as a tactical option when close to a target
-        if (ship.mineTimer <= 0 && dist < 250 && Math.random() < 0.25) {
+        const mineChance = aggressive ? 0.35 : 0.25;
+        const mineRange = aggressive ? 300 : 250;
+        if (ship.mineTimer <= 0 && dist < mineRange && Math.random() < mineChance) {
             deployMine(ship);
             ship.mineTimer = 6 + Math.random() * 8; // cooldown between 6-14s
         }
@@ -246,31 +540,76 @@ function updateAI(ship, dt) {
 
     // Ensure mineTimer counts down even if no target
     ship.mineTimer = Math.max(0, ship.mineTimer - dt);
-    
-    // Turn towards target angle
+    // Ensure avoid timer counts down too
+    ship.avoidMineTimer = Math.max(0, ship.avoidMineTimer - dt);
+
+
+    // Mine avoidance: pick a tangential path around the nearest active mine and hold it briefly
+    if (ship.avoidMineTimer <= 0) {
+        let nearestMine = null;
+        let nearestMineDist = Infinity;
+        for (const m of gameState.mines) {
+            if (!m.active) continue;
+            if (m.ownerId === ship.id) continue;
+            const d = Math.hypot(m.x - ship.x, m.y - ship.y);
+            if (d < nearestMineDist) { nearestMineDist = d; nearestMine = m; }
+        }
+
+        if (nearestMine && nearestMineDist < MINE_DODGE_DETECTION_RADIUS) {
+            if (Math.random() < MINE_DODGE_CHANCE) {
+                const dx = ship.x - nearestMine.x;
+                const dy = ship.y - nearestMine.y;
+                const baseAngle = Math.atan2(dy, dx); // away from mine
+
+                // Compute two possible tangent directions (clockwise / counterclockwise)
+                const tangentA = baseAngle + Math.PI / 2;
+                const tangentB = baseAngle - Math.PI / 2;
+
+                // Choose the tangent that requires the least turning from current heading to keep motion smooth
+                const normAngleDiff = (a, b) => {
+                    let d = a - b;
+                    while (d > Math.PI) d -= Math.PI * 2;
+                    while (d < -Math.PI) d += Math.PI * 2;
+                    return Math.abs(d);
+                };
+                const pick = normAngleDiff(tangentA, ship.angle) < normAngleDiff(tangentB, ship.angle) ? tangentA : tangentB;
+
+                // Gently steer around the mine (small jitter) and hold this avoidance for a short time
+                ship.targetAngle = pick + (Math.random() - 0.5) * 0.2;
+                ship.avoidMineTimer = 0.9 + Math.random() * 0.8; // hold for ~0.9-1.7s
+
+                // Apply a very gentle lateral nudge to encourage a smooth arc (no large speed boosts)
+                const lateralNudge = 0.08; // small fraction of speed
+                ship.velocityX += Math.cos(pick) * ship.data.speed * lateralNudge;
+                ship.velocityY += Math.sin(pick) * ship.data.speed * lateralNudge;
+            }
+        }
+    }
+
+    // Turn towards target angle (slightly faster when aggressive)
     let angleDiff = ship.targetAngle - ship.angle;
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    ship.angle += angleDiff * dt * 2;
-    
-    // Move forward
-    const thrust = ship.data.speed * 0.5;
+    ship.angle += angleDiff * dt * (aggressive ? 2.5 : 2);
+
+    // Move forward (aggressive bots push a bit harder)
+    const thrust = ship.data.speed * (aggressive ? 0.6 : 0.5);
     ship.velocityX += Math.cos(ship.angle) * thrust * dt;
     ship.velocityY += Math.sin(ship.angle) * thrust * dt;
-    
+
     // Update position
     ship.x += ship.velocityX * dt;
     ship.y += ship.velocityY * dt;
-    
+
     // Apply friction
     ship.velocityX *= 0.98;
     ship.velocityY *= 0.98;
-    
+
     // Update fire timer
     ship.fireTimer = Math.max(0, ship.fireTimer - dt);
-    
-    // Keep in bounds
-    const worldSize = 3000;
+
+    // Keep in bounds (world bounds)
+    const worldSize = WORLD_SIZE;
     ship.x = Math.max(-worldSize, Math.min(worldSize, ship.x));
     ship.y = Math.max(-worldSize, Math.min(worldSize, ship.y));
 }
@@ -308,19 +647,31 @@ function fireProjectile(ship) {
             speed: 900,
             damage: ship.data.firepower,
             ownerId: ship.id,
-            lifetime: 2
+            lifetime: 2,
+            radius: 6,
+            bounces: 0
         };
         gameState.projectiles.push(projectile);
     }
 
-    ship.fireTimer = 1 - (ship.data.tier * 0.05);
-}
+    // Make fire rate 2x as fast by halving the default cooldown
+    ship.fireTimer = (1 - (ship.data.tier * 0.05)) * 0.5;
+} 
 
 // Handle damage
 function takeDamage(ship, damage, attackerId) {
     const actualDamage = Math.max(1, damage - ship.data.armor * 0.3);
     ship.health -= actualDamage;
     
+    // Track recent non-storm damage (only count when there was an attacker)
+    // This helps the storm accelerate if there is little combat happening.
+    try {
+        if (attackerId) {
+            gameState.recentDamageEvents = gameState.recentDamageEvents || [];
+            gameState.recentDamageEvents.push({ ts: Date.now(), amount: actualDamage });
+        }
+    } catch (e) { /* ignore tracking failures */ }
+
     // Create damage effect
     const effect = {
         id: `effect_${gameState.nextEffectId++}`,
@@ -331,7 +682,8 @@ function takeDamage(ship, damage, attackerId) {
         lifetime: 0.5
     };
     gameState.effects.push(effect);
-    
+
+
     if (ship.health <= 0) {
         // Create a larger explosion whose size scales with the ship size
         const explosionRadius = Math.max(40, ship.data.size * 3);
@@ -357,6 +709,9 @@ function takeDamage(ship, damage, attackerId) {
                 lifetime: 1 + Math.random() * 1
             });
         }
+
+        // Remove any mines owned by the dying ship
+        try { removeMinesForOwner(ship.id); } catch (e) { /* ignore */ }
         
         // Award kill to attacker and fleet (if any)
         const attacker = gameState.players.get(attackerId) || gameState.aiShips.get(attackerId);
@@ -404,6 +759,13 @@ function gameLoop() {
     gameState.aiShips.forEach(ship => {
         updateAI(ship, dt);
     });
+
+    // Resolve AI collisions against walls (authoritative)
+    try {
+        gameState.aiShips.forEach(ship => {
+            resolveWallCollisionForEntity(ship);
+        });
+    } catch (e) { /* ignore */ }
     
     // Update player positions from their inputs
     gameState.players.forEach(player => {
@@ -421,7 +783,7 @@ function gameLoop() {
             }
         }
         
-        // Update position
+            // Update position
         player.x += player.velocityX * dt;
         player.y += player.velocityY * dt;
         
@@ -429,24 +791,89 @@ function gameLoop() {
         player.velocityX *= 0.98;
         player.velocityY *= 0.98;
         
+        // Authoritative wall resolution for players
+        resolveWallCollisionForEntity(player);
+
         // Update fire timer
         player.fireTimer = Math.max(0, player.fireTimer - dt);
         // Update mine deployment cooldown
         player.mineTimer = Math.max(0, (player.mineTimer || 0) - dt);
         
-        // Keep in bounds
-        const worldSize = 3000;
+        // Keep in bounds (world bounds)
+        const worldSize = WORLD_SIZE;
         player.x = Math.max(-worldSize, Math.min(worldSize, player.x));
         player.y = Math.max(-worldSize, Math.min(worldSize, player.y));
     });
     
-    // Update projectiles
-    gameState.projectiles = gameState.projectiles.filter(proj => {
-        proj.x += Math.cos(proj.angle) * proj.speed * dt;
-        proj.y += Math.sin(proj.angle) * proj.speed * dt;
-        proj.lifetime -= dt;
-        return proj.lifetime > 0;
-    });
+    // Update projectiles (apply motion and authoritative wall bouncing)
+    {
+        const newProjectiles = [];
+        for (let proj of gameState.projectiles) {
+            let vx = Math.cos(proj.angle) * proj.speed;
+            let vy = Math.sin(proj.angle) * proj.speed;
+
+            // Move
+            proj.x += vx * dt;
+            proj.y += vy * dt;
+
+            // Check collision with walls
+            let collided = false;
+            const pr = proj.radius || 6;
+            for (const w of gameState.walls) {
+                const res = circleRectCollision(proj.x, proj.y, pr, w);
+                if (res.collides) {
+                    collided = true;
+
+                    // compute normal
+                    let nx = proj.x - res.nearestX;
+                    let ny = proj.y - res.nearestY;
+                    let len = Math.hypot(nx, ny);
+                    if (len === 0) {
+                        // fallback choose side
+                        const left = w.x - w.width / 2;
+                        const right = w.x + w.width / 2;
+                        const top = w.y - w.height / 2;
+                        const bottom = w.y + w.height / 2;
+                        const dxLeft = Math.abs(proj.x - left);
+                        const dxRight = Math.abs(proj.x - right);
+                        const dyTop = Math.abs(proj.y - top);
+                        const dyBottom = Math.abs(proj.y - bottom);
+                        const minD = Math.min(dxLeft, dxRight, dyTop, dyBottom);
+                        if (minD === dxLeft) { nx = -1; ny = 0; }
+                        else if (minD === dxRight) { nx = 1; ny = 0; }
+                        else if (minD === dyTop) { nx = 0; ny = -1; }
+                        else { nx = 0; ny = 1; }
+                        len = 1;
+                    } else {
+                        nx /= len; ny /= len;
+                    }
+
+                    // reflect velocity
+                    const rv = reflectVector(vx, vy, nx, ny);
+                    vx = rv.x * 0.86; vy = rv.y * 0.86; // dampen a bit
+                    proj.speed = Math.hypot(vx, vy);
+                    proj.angle = Math.atan2(vy, vx);
+                    proj.bounces = (proj.bounces || 0) + 1;
+
+                    // Push projectile slightly out of wall so it doesn't immediately re-collide
+                    proj.x += nx * (pr + 1);
+                    proj.y += ny * (pr + 1);
+
+                    // create a small visual shard effect
+                    gameState.effects.push({ id: `effect_${gameState.nextEffectId++}`, type: 'explosion_fragment', x: proj.x, y: proj.y, vx: rv.x * 20, vy: rv.y * 20, lifetime: 0.4 });
+                    break;
+                }
+            }
+
+            proj.lifetime -= dt;
+
+            // Destroy if too many bounces or lifetime expired
+            if ((proj.bounces && proj.bounces > 3) || proj.lifetime <= 0) continue;
+
+            newProjectiles.push(proj);
+        }
+        gameState.projectiles = newProjectiles;
+    }
 
     // Cap number of active projectiles to avoid runaway resource use
     if (gameState.projectiles.length > MAX_PROJECTILES) {
@@ -590,6 +1017,78 @@ function gameLoop() {
     // and will now permanently die when destroyed. This prevents new AI
     // from being created during runtime so population only decreases over time.
     
+    // Storm update: shrink safe radius and damage ships outside it
+    if (gameState.storm && gameState.storm.active) {
+        const s = gameState.storm;
+        // Shrink safe radius with dynamic adjustment based on recent (player/AI) damage
+        const now = Date.now();
+        const windowMs = (s.shrinkAdjustWindowSec || 5) * 1000;
+        gameState.recentDamageEvents = gameState.recentDamageEvents || [];
+        // Prune events older than our sliding window
+        while (gameState.recentDamageEvents.length && gameState.recentDamageEvents[0].ts < now - windowMs) {
+            gameState.recentDamageEvents.shift();
+        }
+        const damageLastWindow = gameState.recentDamageEvents.reduce((acc, e) => acc + e.amount, 0);
+
+        // Determine target multiplier (1..maxShrinkMultiplier) — more multiplier when damage is low
+        const low = s.lowDamageThreshold || 5;
+        const high = s.highDamageThreshold || 20;
+        const maxMult = s.maxShrinkMultiplier || 2.0;
+        let targetMult = 1;
+        if (damageLastWindow <= low) {
+            targetMult = maxMult;
+        } else if (damageLastWindow < high) {
+            const t = (damageLastWindow - low) / (high - low); // 0..1
+            targetMult = 1 + (1 - t) * (maxMult - 1);
+        } else {
+            targetMult = 1;
+        }
+        // Smoothly adjust multiplier to avoid sudden jumps
+        s.shrinkMultiplier = (s.shrinkMultiplier || 1) + (targetMult - (s.shrinkMultiplier || 1)) * 0.12;
+        const effectiveShrink = (s.baseShrinkRate || s.shrinkRate || 8) * s.shrinkMultiplier;
+        s.currentShrinkRate = effectiveShrink;
+
+        // occasional log when accelerating (throttled)
+        if (s.shrinkMultiplier > 1.05 && (!s._lastLog || now - s._lastLog > 2000)) {
+            console.log(`Storm accelerating: mul=${s.shrinkMultiplier.toFixed(2)}, effectiveShrink=${effectiveShrink.toFixed(2)}, recentDamage=${damageLastWindow.toFixed(1)}`);
+            s._lastLog = now;
+        }
+
+        s.safeRadius = Math.max(0, s.safeRadius - effectiveShrink * (1/30));
+
+        // damage ships outside safe radius
+        const damageThisTick = (s.damagePerSecond || 10) * (1/30);
+        gameState.players.forEach(p => {
+            if (!p || !p.inPlay) return;
+            const d = Math.hypot(p.x - s.x, p.y - s.y);
+            if (d > s.safeRadius) {
+                if (takeDamage(p, damageThisTick, null)) {
+                    gameState.players.delete(p.id);
+                }
+            }
+        });
+        gameState.aiShips.forEach(a => {
+            const d = Math.hypot(a.x - s.x, a.y - s.y);
+            if (d > s.safeRadius) {
+                if (takeDamage(a, damageThisTick, null)) {
+                    gameState.aiShips.delete(a.id);
+                }
+            }
+        });
+
+        // occasional storm visual particles outside the safe radius
+        if (Math.random() < 0.02) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = s.safeRadius + Math.random() * 300;
+            gameState.effects.push({ id: `effect_${gameState.nextEffectId++}`, type: 'storm_gust', x: Math.cos(angle)*r, y: Math.sin(angle)*r, vx: (Math.random()-0.5)*40, vy: (Math.random()-0.5)*40, lifetime: 1.2 });
+        }
+
+        // if fully closed, end the round with no winner
+        if (s.safeRadius <= 0) {
+            endRound();
+        }
+    }
+
     // Broadcast game state to all clients (throttled to reduce network load)
     __tickCounter++;
     if (__tickCounter % BROADCAST_EVERY === 0) {
@@ -666,7 +1165,11 @@ function broadcastGameState() {
             active: m.active,
             lifetime: m.lifetime,
             damage: m.damage
-        }))
+        })),
+        // Static walls (non-overlapping yellow obstacles)
+        walls: (gameState.walls || []).map(w => ({ id: w.id, x: w.x, y: w.y, width: w.width, height: w.height })),
+            // Storm (safe radius shrinking inward)
+        storm: gameState.storm
     };
     
     const message = JSON.stringify(state);
@@ -706,10 +1209,13 @@ wss.on('connection', (ws) => {
                 }
 
                 const shipData = SHIP_CLASSES[0];
+                // Spawn player on a ring further from center to encourage spread across the map
+                const _spawnAngle = Math.random() * Math.PI * 2;
+                const _spawnRadius = (0.5 + Math.random() * 0.45) * WORLD_SIZE; // between 50% and 95% of world
                 const player = {
                     id: playerId,
-                    x: (Math.random() * 2 - 1) * 3000,
-                    y: (Math.random() * 2 - 1) * 3000,
+                    x: Math.cos(_spawnAngle) * _spawnRadius,
+                    y: Math.sin(_spawnAngle) * _spawnRadius,
                     angle: 0,
                     velocityX: 0,
                     velocityY: 0,
@@ -818,10 +1324,13 @@ wss.on('connection', (ws) => {
                         const memberWs = connByPlayerId.get(mid);
                         if (!gameState.players.has(mid)) {
                             const shipData = SHIP_CLASSES[0];
+                            // Spawn fleet member on ring for better spread
+                            const _spawnAngle = Math.random() * Math.PI * 2;
+                            const _spawnRadius = (0.5 + Math.random() * 0.45) * WORLD_SIZE;
                             const p = {
                                 id: mid,
-                                x: (Math.random() * 2 - 1) * 3000,
-                                y: (Math.random() * 2 - 1) * 3000,
+                                x: Math.cos(_spawnAngle) * _spawnRadius,
+                                y: Math.sin(_spawnAngle) * _spawnRadius,
                                 angle: 0,
                                 velocityX: 0,
                                 velocityY: 0,
@@ -927,6 +1436,9 @@ wss.on('connection', (ws) => {
                 }
             }
 
+            // Remove player's mines when they disconnect
+            try { removeMinesForOwner(playerId); } catch (e) { /* ignore */ }
+
             // Remove player from active game if present
             if (gameState.players.has(playerId)) {
                 gameState.players.delete(playerId);
@@ -958,7 +1470,7 @@ function startServer(port) {
 
     server.on('error', onError);
     server.listen(port, () => {
-        console.log(`Naval War IO server running on port ${port}`);
+        console.log(`Fleetfury.win server running on port ${port}`);
         server.removeListener('error', onError);
     });
 }

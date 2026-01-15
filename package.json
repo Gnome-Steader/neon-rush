@@ -1,7 +1,7 @@
 {
-  "name": "naval-war-io",
+  "name": "fleetfury-win",
   "version": "1.0.0",
-  "description": "Multiplayer naval combat game",
+  "description": "Fleetfury.win — Multiplayer fleet combat game",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
