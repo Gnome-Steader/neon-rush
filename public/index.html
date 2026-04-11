@@ -387,7 +387,7 @@
         <!-- Death overlay shown when the local player is eliminated -->
         <div id="deathOverlay" class="ui-element" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:20; pointer-events:auto;">
             <div style="background:rgba(0,0,0,0.85); padding:28px; border-radius:12px; border:2px solid #ff6666; text-align:center; min-width:280px;">
-                <h2 style="color:#ff6666; margin-bottom:12px;">You Died!</h2>
+                <h2 style="color:#ff6666; margin-bottom:12px;">You Sunk!</h2>
                 <button id="deathPlayAgainBtn" style="padding:10px 18px; border-radius:8px; border:none; background:#00a0ff; color:#fff; font-weight:600; cursor:pointer;">Play Again</button>
             </div>
         </div>
@@ -880,6 +880,34 @@
                     if (fs) fs.textContent = `Fleet closed: ${data.code}`;
                     myFleetCode = null; isFleetLeader = false;
                     renderFleetMembers([], 0, null);
+                } else if (data.type === 'fleetVictory') {
+                    // Handle fleet victory
+                    gameStarted = false;
+                    const victoryScreen = document.getElementById('victoryScreen');
+                    if (!victoryScreen) {
+                        const newScreen = document.createElement('div');
+                        newScreen.id = 'victoryScreen';
+                        newScreen.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10, 22, 40, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000;';
+                        newScreen.innerHTML = '<h1 style="color: #00ff88; font-size: 48px; text-shadow: 0 0 20px rgba(0, 255, 136, 0.8);">YOUR FLEET WINS!</h1><p style="color: #0096ff; font-size: 24px; margin-top: 20px;">All fleet members survive!</p>';
+                        document.body.appendChild(newScreen);
+                    }
+                    setTimeout(() => {
+                        location.reload();
+                    }, 4000);
+                } else if (data.type === 'roundEnded') {
+                    // Handle round end
+                    gameStarted = false;
+                    const endScreen = document.getElementById('roundEndScreen');
+                    if (!endScreen) {
+                        const newScreen = document.createElement('div');
+                        newScreen.id = 'roundEndScreen';
+                        newScreen.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10, 22, 40, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000;';
+                        newScreen.innerHTML = '<h1 style="color: #ff5555; font-size: 48px; text-shadow: 0 0 20px rgba(255, 85, 85, 0.8);">ROUND ENDED</h1><p style="color: #0096ff; font-size: 24px; margin-top: 20px;">Restarting game...</p>';
+                        document.body.appendChild(newScreen);
+                    }
+                    setTimeout(() => {
+                        location.reload();
+                    }, 3000);
                 }
             };
             
@@ -1042,11 +1070,22 @@
         function drawProjectile(proj) {
             const isFromPlayer = gameState.players.some(p => p.id === proj.ownerId);
             
+            // Determine if projectile is from own fleet
+            let isOwnFleet = false;
+            try {
+                const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+                const projOwner = gameState.players.find(p => p.id === proj.ownerId) || gameState.aiShips.find(s => s.id === proj.ownerId);
+                if (myPlayer && projOwner && myPlayer.fleetCode && projOwner.fleetCode) {
+                    isOwnFleet = myPlayer.fleetCode === projOwner.fleetCode;
+                }
+            } catch (e) { /* ignore */ }
+            
             ctx.save();
             ctx.translate(proj.x - camera.x, proj.y - camera.y);
             ctx.rotate(proj.angle);
             
-            ctx.fillStyle = isFromPlayer ? '#00ff88' : '#ff5555';
+            // Green if from own fleet, otherwise red for enemy bullets
+            ctx.fillStyle = isOwnFleet ? '#00ff88' : '#ff5555';
             if (!perfMode) {
                 ctx.shadowBlur = 10;
                 ctx.shadowColor = ctx.fillStyle;
@@ -1238,9 +1277,10 @@
                         ctx.arc(mx, my, 3, 0, Math.PI * 2);
                         ctx.fill();
                     } else {
+                        // Treat bots like humans - same size as human players
                         ctx.fillStyle = ship.data.tier >= 10 ? '#ff0000' : '#ff8888';
                         ctx.beginPath();
-                        ctx.arc(mx, my, 2, 0, Math.PI * 2);
+                        ctx.arc(mx, my, 3, 0, Math.PI * 2);
                         ctx.fill();
                     }
                 } catch (e) { /* ignore drawing errors */ }
@@ -1959,6 +1999,66 @@
             const modal = document.getElementById('howModal');
             if (modal) modal.style.display = 'none';
         });
+
+        // Debug: AI-Wall Collision Checker (press 'C' to toggle)
+        let debugMode = false;
+        const debugPanel = document.createElement('div');
+        debugPanel.id = 'debugPanel';
+        debugPanel.style.cssText = `
+            position: fixed;
+            bottom: 200px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 2px solid #ff6b00;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+            z-index: 14;
+            max-width: 300px;
+        `;
+        document.body.appendChild(debugPanel);
+
+        function checkWallCollisions(gameState) {
+            const walls = gameState.walls || [];
+            const ais = gameState.aiShips || [];
+            const overlaps = [];
+            for (const ai of ais) {
+                for (const w of walls) {
+                    const left = w.x - w.width / 2;
+                    const right = w.x + w.width / 2;
+                    const top = w.y - w.height / 2;
+                    const bottom = w.y + w.height / 2;
+                    const r = (ai.data && ai.data.size) ? ai.data.size : 20;
+                    const nearestX = Math.max(left, Math.min(ai.x, right));
+                    const nearestY = Math.max(top, Math.min(ai.y, bottom));
+                    const dx = ai.x - nearestX;
+                    const dy = ai.y - nearestY;
+                    const collides = dx * dx + dy * dy <= r * r;
+                    if (collides) overlaps.push({ aiId: ai.id, wallId: w.id });
+                }
+            }
+            return { walls: walls.length, ais: ais.length, overlaps: overlaps.length, samples: overlaps.slice(0, 3) };
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'c') {
+                debugMode = !debugMode;
+                debugPanel.style.display = debugMode ? 'block' : 'none';
+            }
+        });
+
+        // Hook into gameLoop to update debug info
+        const originalGameLoop = gameLoop;
+        window.gameLoop = function() {
+            originalGameLoop.call(this);
+            if (debugMode && lastGameState) {
+                const collision = checkWallCollisions(lastGameState);
+                debugPanel.textContent = `Walls: ${collision.walls} | AIs: ${collision.ais} | Overlaps: ${collision.overlaps}${collision.samples.length ? ' [' + collision.samples.map(s => s.aiId.substring(0,4)).join(',') + ']' : ''}`;
+            }
+        };
 
         // Initialize demo lobby and start rendering loop
         initDemoShips();

@@ -15,7 +15,7 @@ const SHIP_CLASSES = [
     { tier: 1, name: "Patrol Boat", speed: 240, armor: 20, firepower: 15, health: 100, color: "#4CAF50", size: 20, xpRequired: 100 },
     { tier: 1, name: "Patrol Boat", speed: 300, armor: 15, firepower: 12, health: 80, color: "#8BC34A", size: 18, xpRequired: 100 },
     { tier: 2, name: "Mine Warfare", speed: 150, armor: 30, firepower: 10, health: 150, color: "#795548", size: 25, xpRequired: 200 },
-    { tier: 2, name: "Mine Warfare", speed: 180, armor: 25, firepower: 8, health: 130, color: "#8D6E63", size: 24, xpRequired: 200 },
+    { tier: 2, name: "Mine Warfare", speed: 180, armor: 25, firepower: 15, health: 130, color: "#8D6E63", size: 24, xpRequired: 200 },
     { tier: 3, name: "Submarine", speed: 210, armor: 35, firepower: 25, health: 200, color: "#37474F", size: 28, xpRequired: 350 },
     { tier: 3, name: "Submarine", speed: 180, armor: 30, firepower: 20, health: 180, color: "#455A64", size: 26, xpRequired: 350 },
     { tier: 4, name: "Torpedo Boat", speed: 270, armor: 25, firepower: 35, health: 180, color: "#00BCD4", size: 24, xpRequired: 500 },
@@ -430,8 +430,8 @@ function initializeAIShips() {
         // Increased speed: make the storm shrink 6× faster
         shrinkRate: 48, // base units per second the safe radius shrinks inward (was 8)
         baseShrinkRate: 48, // keep a base value for dynamic scaling (was 8)
-        shrinkMultiplier: 1, // smoothed multiplier applied to shrink rate
-        maxShrinkMultiplier: 2.0, // maximum multiplier when activity is low
+        shrinkMultiplier: 2, // smoothed multiplier applied to shrink rate
+        maxShrinkMultiplier: 3, // maximum multiplier when activity is low
         shrinkAdjustWindowSec: 5, // how many seconds of recent damage to consider
         lowDamageThreshold: 5, // total damage over window below which we speed up fully
         highDamageThreshold: 20, // above this we don't speed up
@@ -1089,11 +1089,78 @@ function gameLoop() {
         }
     }
 
+    // Check for fleet victory: if only one fleet has alive members, they all win
+    try {
+        const alivePlayers = Array.from(gameState.players.values()).filter(p => p && p.inPlay && p.health > 0);
+        const aliveAI = Array.from(gameState.aiShips.values()).filter(s => s && s.health > 0);
+        
+        // Get active fleets (fleets with at least one alive player)
+        const activeFleetsSet = new Set();
+        alivePlayers.forEach(p => {
+            if (p.fleetCode) {
+                activeFleetsSet.add(p.fleetCode);
+            }
+        });
+        
+        // If there's exactly one fleet with alive members, they win
+        if (activeFleetsSet.size === 1 && alivePlayers.length > 0 && aliveAI.length === 0) {
+            const winningFleetCode = Array.from(activeFleetsSet)[0];
+            const winningFleet = gameState.fleets.get(winningFleetCode);
+            if (winningFleet && winningFleet.started) {
+                // Announce victory to all fleet members
+                alivePlayers.forEach(p => {
+                    const pws = connByPlayerId.get(p.id);
+                    if (pws && pws.readyState === WebSocket.OPEN) {
+                        try {
+                            pws.send(JSON.stringify({ type: 'fleetVictory', fleetCode: winningFleetCode, message: 'Your fleet has won!' }));
+                        } catch (e) { /* ignore */ }
+                    }
+                });
+                
+                // Reset for next round
+                endRound();
+            }
+        } else if (alivePlayers.length === 0 && aliveAI.length === 0) {
+            // All players and AI are dead, round is over
+            endRound();
+        }
+    } catch (e) { /* ignore */ }
+
     // Broadcast game state to all clients (throttled to reduce network load)
     __tickCounter++;
     if (__tickCounter % BROADCAST_EVERY === 0) {
         broadcastGameState();
     }
+}
+
+// End the round and reset game state
+function endRound() {
+    // Notify all clients that the round has ended
+    const message = JSON.stringify({ type: 'roundEnded' });
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(message);
+            } catch (e) { /* ignore */ }
+        }
+    });
+
+    // Reset game state
+    gameState.players.forEach(p => {
+        p.inPlay = false;
+        p.health = 0;
+    });
+    gameState.aiShips.clear();
+    gameState.projectiles = [];
+    gameState.effects = [];
+    gameState.mines = [];
+    gameState.storm = null;
+    gameState.fleets.forEach(f => {
+        f.started = false;
+    });
+    
+    // Reinitialize AI ships for next round
+    initializeAIShips();
 }
 
 // Broadcast game state
